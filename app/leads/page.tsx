@@ -151,7 +151,7 @@ export default function LeadsPage() {
     if (filter === 'hot') return isHotLead(lead)
     const active = isLeadActive(lead)
     if (filter === 'active' && !active) return false
-    if (filter === 'inactive' && active) return false
+    if (filter === 'inactive' && (active || isHotLead(lead))) return false
 
     // Date filter
     if (dateFilter) {
@@ -177,9 +177,9 @@ export default function LeadsPage() {
     return sortDir === 'desc' ? dateB - dateA : dateA - dateB
   })
 
-  const activeCount = leads.filter(isLeadActive).length
-  const inactiveCount = leads.length - activeCount
   const hotLeads = leads.filter(isHotLead)
+  const activeCount = leads.filter(isLeadActive).length
+  const inactiveCount = leads.length - activeCount - hotLeads.length
 
   return (
     <div className="leads-container">
