@@ -676,6 +676,31 @@ input[type="file"] {
   border: 1px solid #d1d5db;
 }
 
+/* ===== Hot Leads Tab ===== */
+.filter-tab-hot {
+  color: #dc2626;
+}
+
+.filter-tab-hot:hover {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.filter-tab-hot.active {
+  background: #dc2626;
+  color: white;
+}
+
+.filter-tab-hot .tab-count {
+  background: rgba(220, 38, 38, 0.15);
+  color: #dc2626;
+}
+
+.filter-tab-hot.active .tab-count {
+  background: rgba(255, 255, 255, 0.25);
+  color: white;
+}
+
 /* Empty state */
 .empty-row {
   text-align: center;

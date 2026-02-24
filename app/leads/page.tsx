@@ -9,7 +9,7 @@ const N8N_UPDATE_LEAD_URL = 'https://stan-n8n-u64462.vm.elestio.app/webhook/stel
 // =========================================================
 
 type Lead = Record<string, string>
-type FilterType = 'all' | 'active' | 'inactive'
+type FilterType = 'all' | 'active' | 'inactive' | 'hot'
 
 const CALL_SLOTS = ['Call #1', 'Call #2', 'Call #3', 'Call #4', 'Call #5', 'Call #6', 'Call #7', 'Call #8', 'Call #9']
 
@@ -20,6 +20,15 @@ const isLeadActive = (lead: Lead): boolean => {
   const isComplete = callStatus === 'complete'
   const allCallsFilled = CALL_SLOTS.every(slot => String(lead[slot] || '').trim() !== '')
   return !isComplete && !allCallsFilled
+}
+
+const isHotLead = (lead: Lead): boolean => {
+  const callStatus = String(lead['Call Status'] || '').toLowerCase().trim()
+  const isComplete = callStatus === 'complete'
+  const hasRecording = String(lead['Recordings link'] || '').trim() !== ''
+  const callEvaluation = String(lead['Call Evaluation'] || '').toUpperCase().trim()
+  const evalIsTrue = callEvaluation === 'TRUE'
+  return isComplete && hasRecording && evalIsTrue
 }
 
 type SortDirection = 'asc' | 'desc'
@@ -139,6 +148,7 @@ export default function LeadsPage() {
   }
 
   const filteredLeads = leads.filter(lead => {
+    if (filter === 'hot') return isHotLead(lead)
     const active = isLeadActive(lead)
     if (filter === 'active' && !active) return false
     if (filter === 'inactive' && active) return false
@@ -169,6 +179,7 @@ export default function LeadsPage() {
 
   const activeCount = leads.filter(isLeadActive).length
   const inactiveCount = leads.length - activeCount
+  const hotLeads = leads.filter(isHotLead)
 
   return (
     <div className="leads-container">
@@ -204,6 +215,12 @@ export default function LeadsPage() {
             onClick={() => setFilter('inactive')}
           >
             Inactive <span className="tab-count">{inactiveCount}</span>
+          </button>
+          <button
+            className={`filter-tab filter-tab-hot ${filter === 'hot' ? 'active' : ''}`}
+            onClick={() => setFilter('hot')}
+          >
+            Hot Leads <span className="tab-count">{hotLeads.length}</span>
           </button>
         </div>
         <div className="toolbar-right">
