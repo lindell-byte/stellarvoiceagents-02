@@ -2,12 +2,15 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 
 export default function Home() {
   const router = useRouter()
+  const supabase = createClient()
 
   const handleLogout = async () => {
-    await fetch('/api/auth', { method: 'DELETE' })
+    await supabase.auth.signOut()
+    router.refresh()
     router.push('/login')
   }
 
