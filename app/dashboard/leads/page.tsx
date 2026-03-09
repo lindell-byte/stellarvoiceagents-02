@@ -1,6 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
+import { TAGS_DEFAULT } from '@/lib/leads-constants'
+import type { Lead } from '@/lib/leads-constants'
 import { useLeads } from '@/hooks/useLeads'
 import { LeadsToolbar } from '@/components/LeadsToolbar'
 import { LeadsTable } from '@/components/LeadsTable'
@@ -9,6 +11,37 @@ import { UploadLeadsModal } from '@/components/UploadLeadsModal'
 
 export default function DashboardLeadsPage() {
   const [showUploadModal, setShowUploadModal] = useState(false)
+  // TODO(DB): Fetch availableTags from DB on mount; replace TAGS_DEFAULT with API response.
+  const [availableTags, setAvailableTags] = useState<string[]>(TAGS_DEFAULT)
+  // TODO(DB): Fetch tagsByLead (lead id -> tag[]) from DB on mount; persist on toggle/create below.
+  const [tagsByLead, setTagsByLead] = useState<Record<string, string[]>>({})
+
+  // TODO(DB): Persist add/remove tag to DB when user toggles tag on a lead.
+  const onToggleTag = useCallback((lead: Lead, tag: string) => {
+    const phone = lead['Phone Number'] ?? ''
+    setTagsByLead((prev) => {
+      const current = prev[phone] ?? []
+      const next = current.includes(tag)
+        ? current.filter((t) => t !== tag)
+        : [...current, tag]
+      return { ...prev, [phone]: next }
+    })
+  }, [])
+
+  // TODO(DB): POST new tag to DB when user creates a tag; persist assignment to lead.
+  const onCreateTag = useCallback((lead: Lead, tagName: string) => {
+    const trimmed = tagName.trim()
+    if (!trimmed) return
+    const phone = lead['Phone Number'] ?? ''
+    setAvailableTags((prev) =>
+      prev.includes(trimmed) ? prev : [...prev, trimmed]
+    )
+    setTagsByLead((prev) => {
+      const current = prev[phone] ?? []
+      if (current.includes(trimmed)) return prev
+      return { ...prev, [phone]: [...current, trimmed] }
+    })
+  }, [])
 
   const {
     leads,
@@ -101,6 +134,10 @@ export default function DashboardLeadsPage() {
           search={search}
           sortDir={sortDir}
           setSortDir={setSortDir}
+          availableTags={availableTags}
+          tagsByLead={tagsByLead}
+          onToggleTag={onToggleTag}
+          onCreateTag={onCreateTag}
           onToggleStatus={handleToggleStatus}
           onEdit={handleEdit}
           updatingPhone={updatingPhone}

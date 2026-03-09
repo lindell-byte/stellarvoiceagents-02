@@ -28,6 +28,10 @@ export const CALL_STATUS_OPTIONS = [
   'Complete',
 ]
 
+// TODO(DB): Load available tags from DB on app/leads load; remove TAGS_DEFAULT when API exists.
+/** Dummy default tags; replace with DB load later */
+export const TAGS_DEFAULT: string[] = []
+
 export function isLeadActive(lead: Lead): boolean {
   const callStatus = String(lead['Call Status'] || '').toLowerCase().trim()
   const isComplete = callStatus === 'complete'

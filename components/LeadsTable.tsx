@@ -1,12 +1,17 @@
 'use client'
 
 import { CALL_SLOTS, type Lead, type SortDirection } from '@/lib/leads-constants'
+import { LeadTagsCell } from '@/components/LeadTagsCell'
 
 type LeadsTableProps = {
   filteredLeads: Lead[]
   search: string
   sortDir: SortDirection
   setSortDir: (d: SortDirection) => void
+  availableTags: string[]
+  tagsByLead: Record<string, string[]>
+  onToggleTag: (lead: Lead, tag: string) => void
+  onCreateTag: (lead: Lead, tagName: string) => void
   onToggleStatus: (lead: Lead) => void
   onEdit: (lead: Lead) => void
   updatingPhone: string | null
@@ -18,6 +23,10 @@ export function LeadsTable({
   search,
   sortDir,
   setSortDir,
+  availableTags,
+  tagsByLead,
+  onToggleTag,
+  onCreateTag,
   onToggleStatus,
   onEdit,
   updatingPhone,
@@ -56,6 +65,9 @@ export function LeadsTable({
               Status
             </th>
             <th className="bg-slate-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
+              Tags
+            </th>
+            <th className="bg-slate-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
               Actions
             </th>
           </tr>
@@ -64,7 +76,7 @@ export function LeadsTable({
           {filteredLeads.length === 0 ? (
             <tr>
               <td
-                colSpan={8}
+                colSpan={9}
                 className="px-4 py-10 text-center text-sm text-slate-400"
               >
                 {search ? 'No leads match your search' : 'No leads found'}
@@ -77,6 +89,8 @@ export function LeadsTable({
                 (slot) => (lead[slot] || '').trim() !== ''
               ).length
               const isUpdating = updatingPhone === lead['Phone Number']
+              const phone = lead['Phone Number'] ?? ''
+              const selectedTags = tagsByLead[phone] ?? []
               return (
                 <tr
                   key={i}
@@ -108,6 +122,13 @@ export function LeadsTable({
                       {active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
+                  <LeadTagsCell
+                    lead={lead}
+                    availableTags={availableTags}
+                    selectedTags={selectedTags}
+                    onToggleTag={onToggleTag}
+                    onCreateTag={onCreateTag}
+                  />
                   <td className="whitespace-nowrap px-4 py-2.5">
                     <button
                       className={`mr-2 inline-flex items-center rounded-md border px-2.5 py-1 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${

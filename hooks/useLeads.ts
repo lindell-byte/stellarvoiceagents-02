@@ -39,6 +39,7 @@ export function useLeads() {
       const res = await fetch(N8N_GET_LEADS_URL, { mode: 'cors' })
       if (!res.ok) throw new Error(`Failed to fetch leads (${res.status})`)
       const data = await res.json()
+      // TODO(DB): When API returns tags per lead, merge into lead shape or hydrate tagsByLead from response.
       setLeads(Array.isArray(data.leads) ? data.leads : [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load leads')

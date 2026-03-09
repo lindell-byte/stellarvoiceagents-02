@@ -1,10 +1,37 @@
 'use client'
 
+import { useState, useCallback } from 'react'
 import { CALL_STATUS_OPTIONS, type Lead } from '@/lib/leads-constants'
+
+// TODO(DB): When tags are persisted, optionally add Tags field to this form and sync with DB on save.
+
+const REQUIRED_FIELDS = [
+  'First Name',
+  'Last Name',
+  'Email',
+  'Call Status',
+] as const
+
+function getValidationErrors(form: Record<string, string>): Record<string, string> {
+  const errors: Record<string, string> = {}
+  for (const field of REQUIRED_FIELDS) {
+    const value = (form[field] ?? '').trim()
+    if (!value) {
+      errors[field] = 'Required'
+    }
+  }
+  if (form['Email']?.trim()) {
+    const email = form['Email'].trim()
+    const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+    if (!emailValid) errors['Email'] = 'Enter a valid email address'
+  }
+  return errors
+}
 
 type LeadEditModalProps = {
   lead: Lead
   editForm: Record<string, string>
+  statusOptions?: string[]
   updateEditField: (field: string, value: string) => void
   onSave: () => void
   onClose: () => void
@@ -14,11 +41,40 @@ type LeadEditModalProps = {
 export function LeadEditModal({
   lead,
   editForm,
+  statusOptions = CALL_STATUS_OPTIONS,
   updateEditField,
   onSave,
   onClose,
   saving,
 }: LeadEditModalProps) {
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
+  const handleSave = useCallback(() => {
+    const nextErrors = getValidationErrors(editForm)
+    setErrors(nextErrors)
+    if (Object.keys(nextErrors).length > 0) return
+    onSave()
+  }, [editForm, onSave])
+
+  const handleFieldChange = useCallback(
+    (field: string, value: string) => {
+      updateEditField(field, value)
+      setErrors((prev) => {
+        if (!prev[field]) return prev
+        const next = { ...prev }
+        delete next[field]
+        return next
+      })
+    },
+    [updateEditField]
+  )
+
+  const hasError = (field: string) => !!errors[field]
+  const inputErrorClass = (field: string) =>
+    hasError(field)
+      ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+      : 'border-slate-300 focus:border-blue-500 focus:ring-blue-500/10'
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-5 py-5"
@@ -53,57 +109,69 @@ export function LeadEditModal({
           <div className="flex gap-3">
             <div className="flex flex-1 flex-col gap-1.5">
               <label className="text-sm font-semibold text-slate-600">
-                First Name
+                First Name <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+                className={`w-full rounded-lg border px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 ${inputErrorClass('First Name')}`}
                 value={editForm['First Name']}
-                onChange={(e) => updateEditField('First Name', e.target.value)}
+                onChange={(e) => handleFieldChange('First Name', e.target.value)}
               />
+              {hasError('First Name') && (
+                <p className="text-xs text-red-600">{errors['First Name']}</p>
+              )}
             </div>
             <div className="flex flex-1 flex-col gap-1.5">
               <label className="text-sm font-semibold text-slate-600">
-                Last Name
+                Last Name <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+                className={`w-full rounded-lg border px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 ${inputErrorClass('Last Name')}`}
                 value={editForm['Last Name']}
-                onChange={(e) => updateEditField('Last Name', e.target.value)}
+                onChange={(e) => handleFieldChange('Last Name', e.target.value)}
               />
+              {hasError('Last Name') && (
+                <p className="text-xs text-red-600">{errors['Last Name']}</p>
+              )}
             </div>
           </div>
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-semibold text-slate-600">
-              Email
+              Email <span className="text-red-500">*</span>
             </label>
             <input
               type="email"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+              className={`w-full rounded-lg border px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 ${inputErrorClass('Email')}`}
               value={editForm['Email']}
-              onChange={(e) => updateEditField('Email', e.target.value)}
+              onChange={(e) => handleFieldChange('Email', e.target.value)}
             />
+            {hasError('Email') && (
+              <p className="text-xs text-red-600">{errors['Email']}</p>
+            )}
           </div>
           <div className="flex gap-3">
             <div className="flex flex-1 flex-col gap-1.5">
               <label className="text-sm font-semibold text-slate-600">
-                Call Status
+                Call Status <span className="text-red-500">*</span>
               </label>
               <select
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+                className={`w-full rounded-lg border px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 ${inputErrorClass('Call Status')}`}
                 value={editForm['Call Status']}
                 onChange={(e) =>
-                  updateEditField('Call Status', e.target.value)
+                  handleFieldChange('Call Status', e.target.value)
                 }
               >
                 <option value="">-- Select --</option>
-                {CALL_STATUS_OPTIONS.map((opt) => (
+                {statusOptions.map((opt) => (
                   <option key={opt} value={opt}>
                     {opt}
                   </option>
                 ))}
               </select>
+              {hasError('Call Status') && (
+                <p className="text-xs text-red-600">{errors['Call Status']}</p>
+              )}
             </div>
             <div className="flex flex-1 flex-col gap-1.5">
               <label className="text-sm font-semibold text-slate-600">
@@ -114,7 +182,7 @@ export function LeadEditModal({
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
                 value={editForm['Campaign Date']}
                 onChange={(e) =>
-                  updateEditField('Campaign Date', e.target.value)
+                  handleFieldChange('Campaign Date', e.target.value)
                 }
               />
             </div>
@@ -131,7 +199,7 @@ export function LeadEditModal({
           </button>
           <button
             className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
-            onClick={onSave}
+            onClick={handleSave}
             disabled={saving}
             type="button"
           >
