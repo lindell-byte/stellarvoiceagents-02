@@ -9,7 +9,7 @@ type LeadsTableProps = {
   sortDir: SortDirection
   setSortDir: (d: SortDirection) => void
   availableTags: string[]
-  tagsByLead: Record<string, string[]>
+  getSelectedTagsForLead: (lead: Lead) => string[]
   onToggleTag: (lead: Lead, tag: string) => void
   onCreateTag: (lead: Lead, tagName: string) => void
   onToggleStatus: (lead: Lead) => void
@@ -24,7 +24,7 @@ export function LeadsTable({
   sortDir,
   setSortDir,
   availableTags,
-  tagsByLead,
+  getSelectedTagsForLead,
   onToggleTag,
   onCreateTag,
   onToggleStatus,
@@ -89,8 +89,7 @@ export function LeadsTable({
                 (slot) => (lead[slot] || '').trim() !== ''
               ).length
               const isUpdating = updatingPhone === lead['Phone Number']
-              const phone = lead['Phone Number'] ?? ''
-              const selectedTags = tagsByLead[phone] ?? []
+              const selectedTags = getSelectedTagsForLead(lead)
               return (
                 <tr
                   key={i}

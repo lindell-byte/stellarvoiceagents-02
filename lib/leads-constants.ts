@@ -1,5 +1,8 @@
 // Leads list constants and helpers. Used by dashboard leads page and components.
 
+/** Dashboard leads list: fetched from Supabase via /api/leads. */
+export const LEADS_API_URL = '/api/leads'
+
 export const N8N_GET_LEADS_URL =
   'https://stan-n8n-u64462.vm.elestio.app/webhook/stellarvoiceagents-02-get-leads'
 export const N8N_UPDATE_LEAD_URL =
@@ -28,8 +31,7 @@ export const CALL_STATUS_OPTIONS = [
   'Complete',
 ]
 
-// TODO(DB): Load available tags from DB on app/leads load; remove TAGS_DEFAULT when API exists.
-/** Dummy default tags; replace with DB load later */
+/** Fallback when tags API unavailable; app now loads from /api/tags */
 export const TAGS_DEFAULT: string[] = []
 
 export function isLeadActive(lead: Lead): boolean {

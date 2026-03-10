@@ -1,9 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
-  N8N_GET_LEADS_URL,
-  N8N_UPDATE_LEAD_URL,
+  LEADS_API_URL,
   CALL_SLOTS,
   type Lead,
   type FilterType,
@@ -11,6 +10,7 @@ import {
   isLeadActive,
   isHotLead,
 } from '@/lib/leads-constants'
+import { createClient } from '@/lib/supabase/client'
 
 function parseDateValue(dateStr: string | number): number {
   const str = String(dateStr || '')
@@ -20,6 +20,7 @@ function parseDateValue(dateStr: string | number): number {
 }
 
 export function useLeads() {
+  const supabase = useMemo(() => createClient(), [])
   const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -36,7 +37,7 @@ export function useLeads() {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch(N8N_GET_LEADS_URL, { mode: 'cors' })
+      const res = await fetch(LEADS_API_URL)
       if (!res.ok) throw new Error(`Failed to fetch leads (${res.status})`)
       const data = await res.json()
       // TODO(DB): When API returns tags per lead, merge into lead shape or hydrate tagsByLead from response.
@@ -52,34 +53,35 @@ export function useLeads() {
     fetchLeads()
   }, [fetchLeads])
 
-  const handleToggleStatus = useCallback(async (lead: Lead) => {
-    const phone = lead['Phone Number']
-    if (!phone) return
-    setUpdatingPhone(phone)
-    const active = isLeadActive(lead)
-    const newStatus = active ? 'Complete' : 'Scheduled'
-    try {
-      const res = await fetch(N8N_UPDATE_LEAD_URL, {
-        method: 'POST',
-        mode: 'cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phoneNumber: phone,
-          updates: { 'Call Status': newStatus },
-        }),
-      })
-      if (!res.ok) throw new Error('Update failed')
-      setLeads((prev) =>
-        prev.map((l) =>
-          l['Phone Number'] === phone ? { ...l, 'Call Status': newStatus } : l
+  const handleToggleStatus = useCallback(
+    async (lead: Lead) => {
+      const phone = lead['Phone Number']
+      if (!phone) return
+      setUpdatingPhone(phone)
+      const active = isLeadActive(lead)
+      const newStatus = active ? 'Complete' : 'Scheduled'
+      try {
+        const { error } = await supabase
+          .from('leads')
+          .update({ call_status: newStatus })
+          .eq('phone_number', phone)
+
+        if (error) throw error
+
+        setLeads(prev =>
+          prev.map(l =>
+            l['Phone Number'] === phone ? { ...l, 'Call Status': newStatus } : l
+          )
         )
-      )
-    } catch {
-      alert('Failed to update status. Please try again.')
-    } finally {
-      setUpdatingPhone(null)
-    }
-  }, [])
+      } catch (err) {
+        console.error('Failed to update status via Supabase', err)
+        alert('Failed to update status. Please try again.')
+      } finally {
+        setUpdatingPhone(null)
+      }
+    },
+    [isLeadActive, supabase]
+  )
 
   const handleEdit = useCallback((lead: Lead) => {
     setEditingLead(lead)
@@ -96,33 +98,43 @@ export function useLeads() {
     setEditForm((prev) => ({ ...prev, [field]: value }))
   }, [])
 
-  const handleSaveEdit = useCallback(async () => {
-    if (!editingLead) return
-    const phone = editingLead['Phone Number']
-    setSaving(true)
-    try {
-      const res = await fetch(N8N_UPDATE_LEAD_URL, {
-        method: 'POST',
-        mode: 'cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phoneNumber: phone,
-          updates: editForm,
-        }),
-      })
-      if (!res.ok) throw new Error('Save failed')
-      setLeads((prev) =>
-        prev.map((l) =>
-          l['Phone Number'] === phone ? { ...l, ...editForm } : l
+  const handleSaveEdit = useCallback(
+    async () => {
+      if (!editingLead) return
+      const phone = editingLead['Phone Number']
+      setSaving(true)
+
+      const payload = {
+        first_name: (editForm['First Name'] || '').trim() || null,
+        last_name: (editForm['Last Name'] || '').trim() || null,
+        email: (editForm['Email'] || '').trim() || null,
+        call_status: (editForm['Call Status'] || '').trim() || null,
+        campaign_date: editForm['Campaign Date'] || null,
+      }
+
+      try {
+        const { error } = await supabase
+          .from('leads')
+          .update(payload)
+          .eq('phone_number', phone)
+
+        if (error) throw error
+
+        setLeads(prev =>
+          prev.map(l =>
+            l['Phone Number'] === phone ? { ...l, ...editForm } : l
+          )
         )
-      )
-      setEditingLead(null)
-    } catch {
-      alert('Failed to save changes. Please try again.')
-    } finally {
-      setSaving(false)
-    }
-  }, [editingLead, editForm])
+        setEditingLead(null)
+      } catch (err) {
+        console.error('Failed to save lead via Supabase', err)
+        alert('Failed to save changes. Please try again.')
+      } finally {
+        setSaving(false)
+      }
+    },
+    [editForm, editingLead, supabase]
+  )
 
   const filteredLeads = leads
     .filter((lead) => {
