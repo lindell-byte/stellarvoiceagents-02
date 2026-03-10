@@ -12,6 +12,7 @@ type LeadsTableProps = {
   getSelectedTagsForLead: (lead: Lead) => string[]
   onToggleTag: (lead: Lead, tag: string) => void
   onCreateTag: (lead: Lead, tagName: string) => void
+  onDeleteTag: (tagName: string) => void
   onToggleStatus: (lead: Lead) => void
   onEdit: (lead: Lead) => void
   updatingPhone: string | null
@@ -27,6 +28,7 @@ export function LeadsTable({
   getSelectedTagsForLead,
   onToggleTag,
   onCreateTag,
+  onDeleteTag,
   onToggleStatus,
   onEdit,
   updatingPhone,
@@ -127,6 +129,7 @@ export function LeadsTable({
                     selectedTags={selectedTags}
                     onToggleTag={onToggleTag}
                     onCreateTag={onCreateTag}
+                    onDeleteTag={onDeleteTag}
                   />
                   <td className="whitespace-nowrap px-4 py-2.5">
                     <button

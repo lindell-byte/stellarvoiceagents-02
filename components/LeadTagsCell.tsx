@@ -4,12 +4,13 @@ import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import type { Lead } from '@/lib/leads-constants'
 
-type LeadTagsCellProps = {
+export type LeadTagsCellProps = {
   lead: Lead
   availableTags: string[]
   selectedTags: string[]
   onToggleTag: (lead: Lead, tag: string) => void
   onCreateTag: (lead: Lead, tagName: string) => void
+  onDeleteTag?: (tagName: string) => void
 }
 
 export function LeadTagsCell({
@@ -18,6 +19,7 @@ export function LeadTagsCell({
   selectedTags,
   onToggleTag,
   onCreateTag,
+  onDeleteTag,
 }: LeadTagsCellProps) {
   const [open, setOpen] = useState(false)
   const [newTagName, setNewTagName] = useState('')
@@ -62,6 +64,20 @@ export function LeadTagsCell({
     setOpen(false)
   }
 
+  const handleDeleteTag = async (tag: string) => {
+    try {
+      const res = await fetch(`/api/tags?name=${encodeURIComponent(tag)}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) throw new Error('Failed to delete tag')
+      window.dispatchEvent(new Event('tags:refresh'))
+      setOpen(false)
+    } catch (err) {
+      console.error('Delete tag failed', err)
+      alert('Failed to delete tag. Please try again.')
+    }
+  }
+
   const dropdownContent = open && (
     <div
       ref={dropdownRef}
@@ -82,11 +98,9 @@ export function LeadTagsCell({
         {availableTags.map((tag) => {
           const selected = selectedTags.includes(tag)
           return (
-            <button
+            <div
               key={tag}
-              type="button"
               className="flex w-full items-center gap-2 bg-white px-3 py-1.5 text-left text-sm text-slate-700 hover:bg-slate-100"
-              onClick={() => onToggleTag(lead, tag)}
             >
               <span
                 className={`flex h-4 w-4 items-center justify-center rounded border ${
@@ -97,8 +111,28 @@ export function LeadTagsCell({
               >
                 {selected ? '\u2713' : ''}
               </span>
-              {tag}
-            </button>
+              <button
+                type="button"
+                className="flex-1 text-left"
+                onClick={() => onToggleTag(lead, tag)}
+              >
+                {tag}
+              </button>
+              <button
+                type="button"
+                className="rounded p-1 text-slate-400 hover:bg-slate-200 hover:text-red-600"
+                title={`Delete tag \"${tag}\"`}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                    if (onDeleteTag) onDeleteTag(tag)
+                    else handleDeleteTag(tag)
+                }}
+              >
+                <span className="sr-only">Delete</span>
+                🗑️
+              </button>
+            </div>
           )
         })}
       </div>

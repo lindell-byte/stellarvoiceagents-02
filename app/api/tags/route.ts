@@ -66,3 +66,34 @@ export async function POST(request: Request) {
     )
   }
 }
+
+/** DELETE /api/tags?id=<uuid> - delete a tag (cascades lead_tags). */
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+    const name = searchParams.get('name')
+    if (!id && !name) {
+      return NextResponse.json(
+        { error: 'id or name is required' },
+        { status: 400 }
+      )
+    }
+
+    const supabase = createServerClient()
+    const q = supabase.from('tags').delete()
+    const { error } = id ? await q.eq('id', id) : await q.eq('name', name!)
+    if (error) {
+      console.error('[api/tags]', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    console.error('[api/tags]', err)
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Failed to delete tag' },
+      { status: 500 }
+    )
+  }
+}

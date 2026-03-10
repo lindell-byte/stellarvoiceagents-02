@@ -16,6 +16,7 @@ export default function DashboardLeadsPage() {
     getSelectedTagsForLead,
     onToggleTag,
     onCreateTag,
+    deleteTag,
   } = useTags()
 
   const {
@@ -48,7 +49,7 @@ export default function DashboardLeadsPage() {
   } = useLeads()
 
   return (
-    <div className="flex h-full w-full max-w-6xl flex-col space-y-5">
+    <div className="flex h-full w-full flex-col space-y-5">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">
@@ -113,6 +114,7 @@ export default function DashboardLeadsPage() {
           getSelectedTagsForLead={getSelectedTagsForLead}
           onToggleTag={onToggleTag}
           onCreateTag={onCreateTag}
+          onDeleteTag={deleteTag}
           onToggleStatus={handleToggleStatus}
           onEdit={handleEdit}
           updatingPhone={updatingPhone}

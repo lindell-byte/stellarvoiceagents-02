@@ -45,6 +45,16 @@ export function useTags() {
     fetchTags()
   }, [fetchTags])
 
+  useEffect(() => {
+    const handler = () => {
+      fetchTags()
+    }
+    window.addEventListener('tags:refresh', handler as EventListener)
+    return () => {
+      window.removeEventListener('tags:refresh', handler as EventListener)
+    }
+  }, [fetchTags])
+
   const onToggleTag = useCallback(async (lead: Lead, tagName: string) => {
     const leadId = lead['id']
     if (!leadId) {
@@ -110,12 +120,29 @@ export function useTags() {
     return (tagsByLead[leadId] ?? []).map((t) => t.name)
   }
 
+  const deleteTag = useCallback(
+    async (tagName: string) => {
+      try {
+        const res = await fetch(`/api/tags?name=${encodeURIComponent(tagName)}`, {
+          method: 'DELETE',
+        })
+        if (!res.ok) throw new Error('Failed to delete tag')
+        await fetchTags()
+      } catch (err) {
+        console.error('Delete tag failed', err)
+        alert('Failed to delete tag. Please try again.')
+      }
+    },
+    [fetchTags]
+  )
+
   return {
     availableTagNames,
     tagsByLead,
     getSelectedTagsForLead,
     onToggleTag,
     onCreateTag,
+    deleteTag,
     fetchTags,
     tagsLoading,
   }
