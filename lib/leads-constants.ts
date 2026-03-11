@@ -37,7 +37,8 @@ export const TAGS_DEFAULT: string[] = []
 export function isLeadActive(lead: Lead): boolean {
   const callStatus = String(lead['Call Status'] || '').toLowerCase().trim()
   const isComplete = callStatus === 'complete'
-  const allCallsFilled = CALL_SLOTS.every((slot) => String(lead[slot] || '').trim() !== '')
+  // const allCallsFilled = CALL_SLOTS.every((slot) => String(lead[slot] || '').trim() !== '')
+  const allCallsFilled = String(lead['Attempts Count']) == "11"
   return !isComplete && !allCallsFilled
 }
 

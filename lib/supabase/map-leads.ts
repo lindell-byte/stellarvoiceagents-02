@@ -12,6 +12,7 @@ export type LeadsEnquiryRow = {
   campaign_date?: string | null
   recordings_link?: string | null
   call_evaluation?: boolean | null
+  attempts_count?: number | null
   call_1?: string | null
   call_2?: string | null
   call_3?: string | null
@@ -48,6 +49,7 @@ export function mapLeadsEnquiryToLead(row: LeadsEnquiryRow): Lead {
     'Campaign Date': formatDate(row.campaign_date),
     'Recordings link': row.recordings_link ?? '',
     'Call Evaluation': row.call_evaluation === true ? 'TRUE' : row.call_evaluation === false ? 'FALSE' : '',
+    'Attempts Count': row.attempts_count != null ? String(row.attempts_count) : '',
   }
   CALL_SLOTS.forEach((key, i) => {
     const col = `call_${i + 1}` as keyof LeadsEnquiryRow
@@ -65,6 +67,7 @@ export type LeadRow = {
   email?: string | null
   call_status?: string | null
   campaign_date?: string | null
+  attempts_count?: number | null
   [key: string]: unknown
 }
 
@@ -79,6 +82,7 @@ export function mapLeadRowToLead(row: LeadRow): Lead {
     'Campaign Date': formatDate(row.campaign_date),
     'Recordings link': '',
     'Call Evaluation': '',
+    'Attempts Count': row.attempts_count != null ? String(row.attempts_count) : '',
   }
   CALL_SLOTS.forEach((key) => {
     lead[key] = ''

@@ -22,7 +22,7 @@ export function DashboardSidebar({ className = '', onNavigate }: DashboardSideba
 
   const isActive = (href: string) => pathname === href
 
-  const handleNavClick = (href: string) => {
+  const handleNavClick = () => {
     if (onNavigate) onNavigate()
   }
 
@@ -30,7 +30,7 @@ export function DashboardSidebar({ className = '', onNavigate }: DashboardSideba
     <aside
       className={`flex h-screen w-64 flex-col gap-4 bg-slate-950 px-4 py-5 text-white overflow-hidden ${className}`}
     >
-      <div className="border-b border-slate-600/60 pb-3 mb-2">
+      <div className="pb-3 mb-2 border-b border-slate-600/60">
         <div className="flex items-center gap-2.5">
           <span className="w-7 h-7 rounded-full shadow-[0_0_0_3px_rgba(37,99,235,0.3)] bg-[radial-gradient(circle_at_30%_20%,#38bdf8,#2563eb)]" />
           <div>
@@ -43,7 +43,7 @@ export function DashboardSidebar({ className = '', onNavigate }: DashboardSideba
       <nav className="flex flex-col gap-1">
         <Link
           href="/dashboard/leads"
-          onClick={() => handleNavClick('/dashboard/leads')}
+          onClick={handleNavClick}
           className={`flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium no-underline transition-colors ${
             isActive('/dashboard/leads')
               ? 'bg-slate-900 text-white'
@@ -52,6 +52,19 @@ export function DashboardSidebar({ className = '', onNavigate }: DashboardSideba
         >
           <span className="text-base">&#128203;</span>
           <span>Leads List</span>
+        </Link>
+
+        <Link
+          href="/dashboard/settings"
+          onClick={handleNavClick}
+          className={`flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium no-underline transition-colors ${
+            isActive('/dashboard/settings')
+              ? 'bg-slate-900 text-white'
+              : 'text-slate-200 hover:bg-slate-700/60 hover:text-white'
+          }`}
+        >
+          <span className="text-base">&#9881;&#65039;</span>
+          <span>My Settings</span>
         </Link>
       </nav>
 
@@ -66,4 +79,3 @@ export function DashboardSidebar({ className = '', onNavigate }: DashboardSideba
     </aside>
   )
 }
-

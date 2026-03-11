@@ -1,6 +1,6 @@
 'use client'
 
-import { CALL_SLOTS, type Lead, type SortDirection } from '@/lib/leads-constants'
+import { type Lead, type SortDirection } from '@/lib/leads-constants'
 import { LeadTagsCell } from '@/components/LeadTagsCell'
 
 type LeadsTableProps = {
@@ -36,23 +36,23 @@ export function LeadsTable({
 }: LeadsTableProps) {
   return (
     <div className="min-h-0 max-h-[calc(100vh-220px)] flex-1 overflow-auto rounded-xl bg-white shadow-xl shadow-slate-900/5">
-      <table className="min-w-full border-collapse text-sm">
+      <table className="min-w-full text-sm border-collapse">
         <thead>
           <tr>
-            <th className="bg-slate-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
+            <th className="px-4 py-3 text-xs font-semibold tracking-wide text-left uppercase bg-slate-50 text-slate-600">
               #
             </th>
-            <th className="bg-slate-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
+            <th className="px-4 py-3 text-xs font-semibold tracking-wide text-left uppercase bg-slate-50 text-slate-600">
               Name
             </th>
-            <th className="bg-slate-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
+            <th className="px-4 py-3 text-xs font-semibold tracking-wide text-left uppercase bg-slate-50 text-slate-600">
               Phone
             </th>
-            <th className="bg-slate-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
+            <th className="px-4 py-3 text-xs font-semibold tracking-wide text-left uppercase bg-slate-50 text-slate-600">
               Email
             </th>
             <th
-              className="cursor-pointer bg-slate-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:bg-indigo-50 hover:text-blue-600"
+              className="px-4 py-3 text-xs font-semibold tracking-wide text-left uppercase transition cursor-pointer bg-slate-50 text-slate-600 hover:bg-indigo-50 hover:text-blue-600"
               onClick={() => setSortDir(sortDir === 'desc' ? 'asc' : 'desc')}
               title={`Sort by Campaign Date (${
                 sortDir === 'desc' ? 'newest first' : 'oldest first'
@@ -60,16 +60,16 @@ export function LeadsTable({
             >
               Campaign Date {sortDir === 'desc' ? '\u25BC' : '\u25B2'}
             </th>
-            <th className="bg-slate-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
-              Calls
+            <th className="px-4 py-3 text-xs font-semibold tracking-wide text-left uppercase bg-slate-50 text-slate-600">
+              Attempts
             </th>
-            <th className="bg-slate-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
+            <th className="px-4 py-3 text-xs font-semibold tracking-wide text-left uppercase bg-slate-50 text-slate-600">
               Status
             </th>
-            <th className="bg-slate-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
+            <th className="px-4 py-3 text-xs font-semibold tracking-wide text-left uppercase bg-slate-50 text-slate-600">
               Tags
             </th>
-            <th className="bg-slate-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
+            <th className="px-4 py-3 text-xs font-semibold tracking-wide text-left uppercase bg-slate-50 text-slate-600">
               Actions
             </th>
           </tr>
@@ -79,7 +79,7 @@ export function LeadsTable({
             <tr>
               <td
                 colSpan={9}
-                className="px-4 py-10 text-center text-sm text-slate-400"
+                className="px-4 py-10 text-sm text-center text-slate-400"
               >
                 {search ? 'No leads match your search' : 'No leads found'}
               </td>
@@ -87,9 +87,6 @@ export function LeadsTable({
           ) : (
             filteredLeads.map((lead, i) => {
               const active = isLeadActive(lead)
-              const callsUsed = CALL_SLOTS.filter(
-                (slot) => (lead[slot] || '').trim() !== ''
-              ).length
               const isUpdating = updatingPhone === lead['Phone Number']
               const selectedTags = getSelectedTagsForLead(lead)
               return (
@@ -111,7 +108,7 @@ export function LeadsTable({
                   <td className="px-4 py-2.5">
                     {lead['Campaign Date'] || '-'}
                   </td>
-                  <td className="px-4 py-2.5">{callsUsed}/9</td>
+                  <td className="px-4 py-2.5">{lead['Attempts Count'] || '0'}</td>
                   <td className="px-4 py-2.5">
                     <span
                       className={`inline-block rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${

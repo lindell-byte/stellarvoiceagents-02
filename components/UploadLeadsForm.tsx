@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useRef, type DragEvent, type ChangeEvent } from 'react'
+import { useState, useRef, useEffect, type DragEvent, type ChangeEvent } from 'react'
 import Link from 'next/link'
 import {
   uploadCsvToWebhook,
   CSV_TEMPLATE,
   type UploadResult,
 } from '@/lib/csv-upload'
+import { createClient } from '@/lib/supabase/client'
 
 type StatusType = 'success' | 'error' | 'loading' | null
 
@@ -33,11 +34,31 @@ export function UploadLeadsForm({
   const [campaignDate, setCampaignDate] = useState('')
   const [callImmediately, setCallImmediately] = useState(false)
   const [importResult, setImportResult] = useState<UploadResult | null>(null)
+  const [clientId, setClientId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const tomorrow = new Date()
   tomorrow.setDate(tomorrow.getDate() + 1)
   const minDate = tomorrow.toISOString().split('T')[0]
+
+  useEffect(() => {
+    async function fetchClientId() {
+      try {
+        const supabase = createClient()
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        if (userError || !user?.email) return
+        const { data, error } = await supabase
+          .from('clients')
+          .select('id')
+          .eq('email', user.email)
+          .single()
+        if (!error && data?.id) setClientId(data.id)
+      } catch (err) {
+        console.error('Failed to fetch client id', err)
+      }
+    }
+    fetchClientId()
+  }, [])
 
   const handleUpload = async () => {
     const file = fileInputRef.current?.files?.[0]
@@ -48,6 +69,13 @@ export function UploadLeadsForm({
     if (!callImmediately && !campaignDate) {
       setStatus({
         message: 'Please select a Campaign Date or enable "Call Immediately".',
+        type: 'error',
+      })
+      return
+    }
+    if (!clientId) {
+      setStatus({
+        message: 'Could not resolve your client account. Please refresh and try again.',
         type: 'error',
       })
       return
@@ -63,6 +91,7 @@ export function UploadLeadsForm({
       const result = await uploadCsvToWebhook(file, {
         campaignDate,
         callImmediately,
+        clientId,
       })
       setImportResult(result)
       setStatus({ message: 'File processed successfully.', type: 'success' })
@@ -162,14 +191,14 @@ export function UploadLeadsForm({
               : 'Upload your CSV file to add Leads/Enquiries'}
           </p>
         </div>
-        {variant === 'page' && (
+        {/* {variant === 'page' && ( */}
           <button
             className="mt-1 text-sm font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700"
             onClick={handleDownloadTemplate}
           >
             Download Template
           </button>
-        )}
+        {/* )} */}
         {onClose && (
           <button
             className="text-xl leading-none text-slate-400 hover:text-slate-700 disabled:opacity-50"
@@ -220,12 +249,12 @@ export function UploadLeadsForm({
       </div>
 
       <div className={isModal ? 'mb-3 text-left' : 'my-4 text-left'}>
-        <label className="flex cursor-pointer items-center text-sm text-slate-700">
+        <label className="flex items-center text-sm cursor-pointer text-slate-700">
           <input
             type="checkbox"
             checked={callImmediately}
             onChange={(e) => setCallImmediately(e.target.checked)}
-            className="mr-2 h-4 w-4 cursor-pointer accent-blue-600"
+            className="w-4 h-4 mr-2 cursor-pointer accent-blue-600"
           />
           <span className="font-medium">Call Immediately</span>
         </label>
@@ -238,7 +267,7 @@ export function UploadLeadsForm({
       >
         <label
           htmlFor={isModal ? 'campaignDateModal' : 'campaignDate'}
-          className="mb-1 block text-sm font-medium text-slate-700"
+          className="block mb-1 text-sm font-medium text-slate-700"
         >
           Campaign Date
         </label>
@@ -250,7 +279,7 @@ export function UploadLeadsForm({
         <input
           type="date"
           id={isModal ? 'campaignDateModal' : 'campaignDate'}
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+          className="w-full px-3 py-2 text-sm transition border rounded-lg outline-none border-slate-300 text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
           value={campaignDate}
           min={minDate}
           onChange={(e) => setCampaignDate(e.target.value)}
@@ -261,7 +290,7 @@ export function UploadLeadsForm({
       <button
         className={`w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300 ${isModal ? 'mb-3' : 'mt-2'}`}
         onClick={handleUpload}
-        disabled={isUploading}
+        disabled={isUploading || !clientId}
       >
         {isUploading ? 'Processing...' : 'Upload File'}
       </button>
@@ -320,17 +349,17 @@ export function UploadLeadsForm({
                 <h3 className="text-sm font-semibold text-amber-800">
                   Duplicate Leads/Enquiries Skipped
                 </h3>
-                <div className="max-h-56 overflow-y-auto rounded-lg border border-amber-300">
-                  <table className="min-w-full border-collapse text-xs">
+                <div className="overflow-y-auto border rounded-lg max-h-56 border-amber-300">
+                  <table className="min-w-full text-xs border-collapse">
                     <thead>
                       <tr>
-                        <th className="bg-amber-50 px-3 py-2 text-left font-semibold text-amber-800">
+                        <th className="px-3 py-2 font-semibold text-left bg-amber-50 text-amber-800">
                           #
                         </th>
-                        <th className="bg-amber-50 px-3 py-2 text-left font-semibold text-amber-800">
+                        <th className="px-3 py-2 font-semibold text-left bg-amber-50 text-amber-800">
                           Name
                         </th>
-                        <th className="bg-amber-50 px-3 py-2 text-left font-semibold text-amber-800">
+                        <th className="px-3 py-2 font-semibold text-left bg-amber-50 text-amber-800">
                           Phone
                         </th>
                       </tr>
