@@ -11,9 +11,25 @@ type ClientProfile = {
   timezone: string | null
   vapi_assistant_id: string | null
   country_code: string | null
+  campaign_settings: any | null
 }
 
 type StatusType = 'success' | 'error' | 'loading' | null
+
+// ────────────────────────────────────────────────
+// Campaign Day shape (UI-friendly)
+type CampaignDay = {
+  day_offset: number          // 0 = Day 1, 1 = Day 2, ...
+  action: 'none' | 'call' | 'sms'
+  times: string[]             // e.g. ["08:00", "12:00"]
+}
+
+// Available time slots (customize as needed)
+const availableTimes = [
+  '08:00', '09:00', '10:00', '11:00', '12:00',
+  '13:00', '14:00', '15:00', '16:00', '17:00',
+  '18:00', '19:00', '20:00'
+]
 
 export default function SettingsPage() {
   const supabase = createClient()
@@ -25,6 +41,7 @@ export default function SettingsPage() {
     vapi_assistant_id: '',
     country_code: '',
   })
+  const [days, setDays] = useState<CampaignDay[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState<{ message: string; type: StatusType }>({
@@ -33,14 +50,14 @@ export default function SettingsPage() {
   })
   const [userEmail, setUserEmail] = useState<string | null>(null)
 
+  // ────────────────────────────────────────────────
+  // Load profile + campaign settings
+  // ────────────────────────────────────────────────
   useEffect(() => {
     async function loadProfile() {
       setLoading(true)
       try {
-        const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser()
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
 
         if (userError || !user?.email) {
           setStatus({ message: 'Could not load user session.', type: 'error' })
@@ -55,11 +72,8 @@ export default function SettingsPage() {
           .eq('email', user.email)
           .single()
 
-        if (error) {
-          setStatus({
-            message: 'No client profile found for your account.',
-            type: 'error',
-          })
+        if (error || !data) {
+          setStatus({ message: 'No client profile found.', type: 'error' })
           return
         }
 
@@ -70,6 +84,36 @@ export default function SettingsPage() {
           vapi_assistant_id: data.vapi_assistant_id ?? '',
           country_code: data.country_code ?? '',
         })
+
+        // Load campaign settings into UI-friendly days array
+        if (data.campaign_settings?.daily_schedule?.length > 0) {
+          const loadedDays = data.campaign_settings.daily_schedule.map((s: any) => {
+            const actions = s.actions || []
+            let action: CampaignDay['action'] = 'none'
+            let times: string[] = []
+
+            if (actions.length === 1) {
+              action = actions[0].type
+              times = actions[0].times || []
+            } 
+            // else if (actions.length === 2) {
+            //   action = 'both'
+            //   // Merge times (assuming same times for call & sms)
+            //   times = [...new Set([...(actions[0].times || []), ...(actions[1].times || [])])]
+            // }
+
+            return {
+              day_offset: s.day_offset,
+              action,
+              times,
+            }
+          })
+
+          setDays(loadedDays)
+        } else {
+          // Default: one empty day
+          setDays([{ day_offset: 0, action: 'none', times: [] }])
+        }
       } catch (err) {
         setStatus({
           message: err instanceof Error ? err.message : 'Unexpected error loading profile.',
@@ -83,10 +127,64 @@ export default function SettingsPage() {
     loadProfile()
   }, [])
 
+  // ────────────────────────────────────────────────
+  // Day management helpers
+  // ────────────────────────────────────────────────
+  const addDay = () => {
+    const newOffset = days.length > 0 ? days[days.length - 1].day_offset + 1 : 0
+    setDays([...days, { day_offset: newOffset, action: 'none', times: [] }])
+  }
+
+  const removeDay = (index: number) => {
+    if (days.length <= 1) return // keep at least one day
+    setDays(days.filter((_, i) => i !== index))
+  }
+
+  const updateDay = (index: number, field: keyof CampaignDay, value: any) => {
+    setDays(days.map((d, i) => (i === index ? { ...d, [field]: value } : d)))
+  }
+
+  const toggleTime = (index: number, time: string) => {
+    setDays(days.map((d, i) => {
+      if (i !== index) return d
+      const times = d.times.includes(time)
+        ? d.times.filter(t => t !== time)
+        : [...d.times, time].sort()
+      return { ...d, times }
+    }))
+  }
+
+  // ────────────────────────────────────────────────
+  // Save handler
+  // ────────────────────────────────────────────────
   const handleSave = async () => {
     if (!profile) return
     setSaving(true)
     setStatus({ message: '', type: null })
+
+    // Build campaign_settings object from UI days
+    const dailySchedule = days
+      .filter(d => d.action !== 'none' && d.times.length > 0)
+      .map(d => {
+        const actions = []
+        if (d.action === 'call') {
+          actions.push({ type: 'call', times: d.times })
+        }
+        if (d.action === 'sms') {
+          actions.push({ type: 'sms', times: d.times })
+        }
+        return {
+          day_offset: d.day_offset,
+          actions,
+        }
+      })
+
+    const campaignSettingsToSave = dailySchedule.length > 0
+      ? {
+          total_days: Math.max(...days.map(d => d.day_offset)) + 1,
+          daily_schedule: dailySchedule,
+        }
+      : null
 
     try {
       const { error } = await supabase
@@ -96,13 +194,14 @@ export default function SettingsPage() {
           timezone: form.timezone.trim() || null,
           vapi_assistant_id: form.vapi_assistant_id.trim() || null,
           country_code: form.country_code.trim() || null,
+          campaign_settings: campaignSettingsToSave,
         })
         .eq('id', profile.id)
 
       if (error) throw error
 
       setStatus({ message: 'Settings saved successfully.', type: 'success' })
-      setProfile((prev) => prev ? { ...prev, ...form } : prev)
+      setProfile(prev => prev ? { ...prev, campaign_settings: campaignSettingsToSave } : null)
     } catch (err) {
       setStatus({
         message: err instanceof Error ? err.message : 'Failed to save settings.',
@@ -127,7 +226,7 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-50">
+      <div className="flex items-center justify-center h-full bg-slate-50">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-blue-600 rounded-full animate-spin border-t-transparent" />
           <p className="text-sm text-slate-500">Loading your profile...</p>
@@ -137,17 +236,19 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen px-4 py-10 bg-slate-50">
-      <div className="max-w-2xl mx-auto">
+    <div className="flex flex-col min-h-screen bg-slate-50">
+      {/* Scrollable main content */}
+      <main className="flex-1 px-4 py-10 overflow-y-auto">
+      <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-2xl font-semibold text-slate-900">My Settings</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Manage your account details and preferences.
+            Manage your account details, preferences, and campaign behavior.
           </p>
         </div>
 
-        {/* Account Info Card (read-only) */}
+        {/* Account Info (read-only) */}
         {profile && (
           <div className="p-6 mb-6 bg-white border shadow-sm rounded-xl border-slate-200">
             <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase text-slate-500">
@@ -168,7 +269,7 @@ export default function SettingsPage() {
               </div>
               <div>
                 <p className="text-xs font-medium text-slate-500">Account ID</p>
-                <p className="mt-0.5 font-mono text-xs text-slate-400">
+                <p className="mt-0.5 font-mono text-xs text-slate-400 break-all">
                   {profile.id}
                 </p>
               </div>
@@ -176,119 +277,177 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* Error state when no profile */}
-        {!profile && status.type === 'error' && (
-          <div className="px-4 py-3 mb-6 text-sm text-red-800 border border-red-200 rounded-xl bg-red-50">
-            {status.message}
-          </div>
-        )}
-
-        {/* Editable Fields */}
+        {/* Main form */}
         {profile && (
-          <div className="p-6 bg-white border shadow-sm rounded-xl border-slate-200">
-            <h2 className="mb-5 text-sm font-semibold tracking-wide uppercase text-slate-500">
-              Profile Details
-            </h2>
+          <div className="p-6 space-y-8 bg-white border shadow-sm rounded-xl border-slate-200">
+            {/* Profile Details */}
+            <div>
+              <h2 className="mb-5 text-sm font-semibold tracking-wide uppercase text-slate-500">
+                Profile Details
+              </h2>
+              <div className="space-y-5">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-slate-700">Name</label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 text-sm border rounded-lg border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+                    value={form.name}
+                    onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                    disabled={saving}
+                  />
+                </div>
 
-            <div className="space-y-5">
-              {/* Name */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-slate-700">
-                  Name
-                </label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 text-sm transition border rounded-lg outline-none border-slate-300 text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
-                  placeholder="Your name"
-                  value={form.name}
-                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  disabled={saving}
-                />
-              </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-slate-700">Timezone</label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 text-sm border rounded-lg border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+                    placeholder="e.g. Asia/Manila"
+                    value={form.timezone}
+                    onChange={e => setForm(f => ({ ...f, timezone: e.target.value }))}
+                    disabled={saving}
+                  />
+                </div>
 
-              {/* Timezone */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-slate-700">
-                  Timezone
-                </label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 text-sm transition border rounded-lg outline-none border-slate-300 text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
-                  placeholder="e.g. America/New_York"
-                  value={form.timezone}
-                  onChange={(e) => setForm((f) => ({ ...f, timezone: e.target.value }))}
-                  disabled={saving}
-                />
-                <p className="text-xs text-slate-400">
-                  Use IANA timezone format, e.g. <span className="font-mono">Asia/Manila</span>,{' '}
-                  <span className="font-mono">America/New_York</span>
-                </p>
-              </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-slate-700">Country Code</label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 text-sm border rounded-lg border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+                    placeholder="e.g. +63"
+                    value={form.country_code}
+                    onChange={e => setForm(f => ({ ...f, country_code: e.target.value }))}
+                    disabled={saving}
+                  />
+                </div>
 
-              {/* Country Code */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-slate-700">
-                  Country Code
-                </label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 text-sm transition border rounded-lg outline-none border-slate-300 text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
-                  placeholder="e.g. +1, +63"
-                  value={form.country_code}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, country_code: e.target.value }))
-                  }
-                  disabled={saving}
-                />
-              </div>
-
-              {/* VAPI Assistant ID */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-slate-700">
-                  VAPI Assistant ID
-                </label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 font-mono text-sm transition border rounded-lg outline-none border-slate-300 text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
-                  placeholder="vapi-assistant-id"
-                  value={form.vapi_assistant_id}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, vapi_assistant_id: e.target.value }))
-                  }
-                  disabled={saving}
-                />
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-slate-700">VAPI Assistant ID</label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 font-mono text-sm border rounded-lg border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+                    value={form.vapi_assistant_id}
+                    onChange={e => setForm(f => ({ ...f, vapi_assistant_id: e.target.value }))}
+                    disabled={saving}
+                  />
+                </div>
               </div>
             </div>
 
-            {/* Status message */}
-            {status.type && status.type !== null && (
+            {/* Campaign Settings */}
+            <div className="pt-6 border-t border-slate-200">
+              <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase text-slate-500">
+                Campaign Settings
+              </h2>
+              <p className="mb-4 text-sm text-slate-600">
+                Define what happens each day of the campaign (Day 1 = campaign start date).
+              </p>
+
+              <div className="space-y-6">
+                {days.map((day, index) => (
+                  <div
+                    key={index}
+                    className="p-5 border border-slate-200 rounded-xl bg-slate-50"
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-base font-medium text-slate-800">
+                        Day {day.day_offset + 1}
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => removeDay(index)}
+                        className="text-sm text-red-600 hover:text-red-800 disabled:opacity-50"
+                        disabled={saving || days.length <= 1}
+                      >
+                        Remove
+                      </button>
+                    </div>
+
+                    <div className="space-y-5">
+                      {/* Action */}
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                          Action
+                        </label>
+                        <select
+                          value={day.action}
+                          onChange={e => updateDay(index, 'action', e.target.value)}
+                          className="w-full px-3 py-2 text-sm border rounded-lg border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+                          disabled={saving}
+                        >
+                          <option value="none">Do nothing</option>
+                          <option value="call">Call only</option>
+                          <option value="sms">SMS only</option>
+                          {/* <option value="both">Call and SMS</option> */}
+                        </select>
+                      </div>
+
+                      {/* Times */}
+                      {day.action !== 'none' && (
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                            Times to contact (select one or more)
+                          </label>
+                          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                            {availableTimes.map(time => (
+                              <label key={time} className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={day.times.includes(time)}
+                                  onChange={() => toggleTime(index, time)}
+                                  disabled={saving}
+                                  className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                                />
+                                <span className="text-sm text-slate-700">{time}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Add Day */}
+                <button
+                  type="button"
+                  onClick={addDay}
+                  className="w-full py-3 text-sm font-medium text-blue-600 transition border-2 border-blue-300 border-dashed rounded-xl hover:bg-blue-50 disabled:opacity-50"
+                  disabled={saving}
+                >
+                  + Add Next Day
+                </button>
+              </div>
+            </div>
+
+            {/* Status */}
+            {status.type && (
               <div
-                className={`mt-5 rounded-lg border px-3 py-2 text-sm ${
+                className={`mt-8 rounded-lg border px-4 py-3 text-sm ${
                   status.type === 'success'
                     ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
-                    : status.type === 'error'
-                      ? 'border-red-300 bg-red-50 text-red-800'
-                      : 'border-blue-300 bg-blue-50 text-blue-800'
+                    : 'border-red-300 bg-red-50 text-red-800'
                 }`}
               >
                 {status.message}
               </div>
             )}
 
-            {/* Save Button */}
-            <div className="flex justify-end mt-6">
+            {/* Save */}
+            <div className="flex justify-end mt-8">
               <button
                 type="button"
-                className="px-5 py-2 text-sm font-medium text-white transition bg-blue-600 rounded-lg hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
                 onClick={handleSave}
                 disabled={saving}
+                className="px-6 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition"
               >
-                {saving ? 'Saving...' : 'Save Changes'}
+                {saving ? 'Saving...' : 'Save All Changes'}
               </button>
             </div>
           </div>
         )}
       </div>
+      </main>
     </div>
   )
 }
