@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   LEADS_API_URL,
-  CALL_SLOTS,
   type Lead,
   type FilterType,
   type SortDirection,
@@ -24,6 +23,7 @@ export function useLeads() {
   const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [clientId, setClientId] = useState<string | null>(null)
   const [filter, setFilter] = useState<FilterType>('all')
   const [search, setSearch] = useState('')
   const [dateFilter, setDateFilter] = useState('')
@@ -33,21 +33,40 @@ export function useLeads() {
   const [saving, setSaving] = useState(false)
   const [updatingPhone, setUpdatingPhone] = useState<string | null>(null)
 
+  // Resolve client_id once on mount
+  useEffect(() => {
+    async function resolveClientId() {
+      try {
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        if (userError || !user?.email) return
+        const { data, error } = await supabase
+          .from('clients')
+          .select('id')
+          .eq('email', user.email)
+          .single()
+        if (!error && data?.id) setClientId(data.id)
+      } catch (err) {
+        console.error('Failed to resolve client id', err)
+      }
+    }
+    resolveClientId()
+  }, [supabase])
+
   const fetchLeads = useCallback(async () => {
+    if (!clientId) return
     setLoading(true)
     setError('')
     try {
-      const res = await fetch(LEADS_API_URL)
+      const res = await fetch(`${LEADS_API_URL}?client_id=${clientId}`)
       if (!res.ok) throw new Error(`Failed to fetch leads (${res.status})`)
       const data = await res.json()
-      // TODO(DB): When API returns tags per lead, merge into lead shape or hydrate tagsByLead from response.
       setLeads(Array.isArray(data.leads) ? data.leads : [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load leads')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [clientId])
 
   useEffect(() => {
     fetchLeads()
@@ -65,6 +84,7 @@ export function useLeads() {
           .from('leads')
           .update({ call_status: newStatus })
           .eq('phone_number', phone)
+          .eq('client_id', clientId)
 
         if (error) throw error
 
@@ -80,7 +100,7 @@ export function useLeads() {
         setUpdatingPhone(null)
       }
     },
-    [isLeadActive, supabase]
+    [clientId, supabase]
   )
 
   const handleEdit = useCallback((lead: Lead) => {
@@ -117,6 +137,7 @@ export function useLeads() {
           .from('leads')
           .update(payload)
           .eq('phone_number', phone)
+          .eq('client_id', clientId)
 
         if (error) throw error
 
@@ -133,7 +154,7 @@ export function useLeads() {
         setSaving(false)
       }
     },
-    [editForm, editingLead, supabase]
+    [clientId, editForm, editingLead, supabase]
   )
 
   const filteredLeads = leads

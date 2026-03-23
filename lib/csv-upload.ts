@@ -6,7 +6,7 @@ John,Smith,2125551234,john@example.com
 Jane,Doe,3105559876,jane@example.com`
 
 export const N8N_UPLOAD_WEBHOOK_URL =
-  'https://stan-n8n-u64462.vm.elestio.app/webhook/update-lead-supabase'
+  'https://stan-n8n-u64462.vm.elestio.app/webhook/upload-lead-supabase'
 
 export const FIRST_NAME_ALIASES = ['first name', 'firstname', 'first_name', 'given name']
 export const LAST_NAME_ALIASES = ['last name', 'lastname', 'last_name', 'surname', 'family name']
