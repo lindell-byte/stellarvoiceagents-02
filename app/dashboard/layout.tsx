@@ -17,10 +17,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <div className="flex min-h-screen">
-      {/* Desktop sidebar */}
-      <div className="hidden md:block">
-        <DashboardSidebar />
+    <div className="flex min-h-screen bg-slate-50">
+      {/* Desktop sidebar – fixed/sticky, full height */}
+      <div className="hidden md:block md:w-64 md:flex-shrink-0">
+        <div className="sticky top-0 h-screen overflow-y-auto">
+          <DashboardSidebar />
+        </div>
       </div>
 
       {/* Mobile sidebar overlay */}
@@ -30,22 +32,22 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             className="absolute inset-0 bg-black/50"
             onClick={() => setIsMobileOpen(false)}
           />
-          <div className="relative z-50">
+          <div className="relative z-50 max-w-xs w-72">
             <DashboardSidebar
-              className="w-72 shadow-2xl"
+              className="h-full shadow-2xl"
               onNavigate={() => setIsMobileOpen(false)}
             />
           </div>
         </div>
       )}
 
-      {/* Main content */}
-      <section className="flex-1 flex flex-col gap-5 px-4 py-5 md:px-8 md:py-7">
+      {/* Main content – scrolls independently */}
+      <div className="flex flex-col flex-1 overflow-hidden">
         {/* Mobile top bar with menu button */}
-        <div className="mb-2 flex items-center justify-between md:hidden">
+        <div className="sticky top-0 z-30 flex items-center justify-between px-4 py-3 bg-white shadow-sm md:hidden">
           <button
             type="button"
-            className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm"
+            className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium bg-white border rounded-md shadow-sm border-slate-300 text-slate-700"
             onClick={() => setIsMobileOpen(true)}
           >
             <span className="inline-flex flex-col justify-between h-3">
@@ -57,9 +59,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </button>
         </div>
 
-        {children}
-      </section>
+        {/* Scrollable content area */}
+        <main className="flex-1 px-4 py-5 overflow-y-auto md:px-8 md:py-7">
+          {children}
+        </main>
+      </div>
     </div>
   )
 }
-
