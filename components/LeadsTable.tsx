@@ -13,9 +13,16 @@ type LeadsTableProps = {
   onToggleTag: (lead: Lead, tag: string) => void
   onCreateTag: (lead: Lead, tagName: string) => void
   onDeleteTag: (tagName: string) => void
-  onToggleStatus: (lead: Lead) => void
   onEdit: (lead: Lead) => void
-  updatingPhone: string | null
+  selectedPhones: Set<string>
+  visiblePhones: string[]
+  allVisibleSelected: boolean
+  bulkUpdating: boolean
+  onTogglePhoneSelected: (phone: string) => void
+  onToggleSelectAllVisible: () => void
+  onClearSelection: () => void
+  onBulkActivate: () => void
+  onBulkDeactivate: () => void
   isLeadActive: (lead: Lead) => boolean
 }
 
@@ -29,16 +36,67 @@ export function LeadsTable({
   onToggleTag,
   onCreateTag,
   onDeleteTag,
-  onToggleStatus,
   onEdit,
-  updatingPhone,
+  selectedPhones,
+  visiblePhones,
+  allVisibleSelected,
+  bulkUpdating,
+  onTogglePhoneSelected,
+  onToggleSelectAllVisible,
+  onClearSelection,
+  onBulkActivate,
+  onBulkDeactivate,
   isLeadActive,
 }: LeadsTableProps) {
   return (
     <div className="min-h-0 max-h-[calc(100vh-220px)] flex-1 overflow-auto rounded-xl bg-white shadow-xl shadow-slate-900/5">
+      {selectedPhones.size > 0 && (
+        <div className="flex items-center justify-between gap-3 border-b border-blue-200 bg-blue-50 px-4 py-3">
+          <p className="text-sm font-semibold text-blue-900">
+            {selectedPhones.size} selected
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className="inline-flex items-center rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={onBulkActivate}
+              disabled={bulkUpdating}
+            >
+              {bulkUpdating ? 'Working...' : 'Activate'}
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center rounded-md border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-800 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={onBulkDeactivate}
+              disabled={bulkUpdating}
+            >
+              {bulkUpdating ? 'Working...' : 'Deactivate'}
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={onClearSelection}
+              disabled={bulkUpdating}
+            >
+              Clear selection
+            </button>
+          </div>
+        </div>
+      )}
       <table className="min-w-full text-sm border-collapse">
         <thead>
           <tr>
+            <th className="w-10 px-3 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-600 bg-slate-50">
+              <input
+                type="checkbox"
+                className="h-4 w-4 cursor-pointer accent-blue-600"
+                checked={allVisibleSelected}
+                onChange={onToggleSelectAllVisible}
+                disabled={visiblePhones.length === 0}
+                title="Select all visible rows"
+                aria-label="Select all visible rows"
+              />
+            </th>
             <th className="px-4 py-3 text-xs font-semibold tracking-wide text-left uppercase bg-slate-50 text-slate-600">
               #
             </th>
@@ -78,7 +136,7 @@ export function LeadsTable({
           {filteredLeads.length === 0 ? (
             <tr>
               <td
-                colSpan={9}
+                colSpan={10}
                 className="px-4 py-10 text-sm text-center text-slate-400"
               >
                 {search ? 'No leads match your search' : 'No leads found'}
@@ -87,15 +145,26 @@ export function LeadsTable({
           ) : (
             filteredLeads.map((lead, i) => {
               const active = isLeadActive(lead)
-              const isUpdating = updatingPhone === lead['Phone Number']
+              const phone = String(lead['Phone Number'] || '').trim()
+              const rowSelected = phone ? selectedPhones.has(phone) : false
               const selectedTags = getSelectedTagsForLead(lead)
               return (
                 <tr
-                  key={i}
+                  key={phone || i}
                   className={`border-t border-slate-100 ${
                     active ? '' : 'opacity-60 hover:opacity-85'
                   } hover:bg-slate-50`}
                 >
+                  <td className="px-3 py-2.5 text-center">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 cursor-pointer accent-blue-600"
+                      checked={rowSelected}
+                      onChange={() => onTogglePhoneSelected(phone)}
+                      disabled={!phone}
+                      aria-label="Select lead row"
+                    />
+                  </td>
                   <td className="px-4 py-2.5">{i + 1}</td>
                   <td className="whitespace-nowrap px-4 py-2.5 font-medium text-slate-900">
                     {`${lead['First Name'] || ''} ${lead['Last Name'] || ''}`.trim() ||
@@ -129,18 +198,6 @@ export function LeadsTable({
                     onDeleteTag={onDeleteTag}
                   />
                   <td className="whitespace-nowrap px-4 py-2.5">
-                    <button
-                      className={`mr-2 inline-flex items-center rounded-md border px-2.5 py-1 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                        active
-                          ? 'border-red-200 bg-red-50 text-red-800 hover:bg-red-100'
-                          : 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-                      }`}
-                      onClick={() => onToggleStatus(lead)}
-                      disabled={isUpdating}
-                      type="button"
-                    >
-                      {isUpdating ? '...' : active ? 'Deactivate' : 'Activate'}
-                    </button>
                     <button
                       className="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
                       onClick={() => onEdit(lead)}
