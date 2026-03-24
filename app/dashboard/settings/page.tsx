@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 type ClientProfile = {
@@ -31,6 +31,13 @@ const availableTimes = [
   '18:00', '19:00', '20:00'
 ]
 
+/** SMS days in schedule order → sms_1, sms_2, … (by day_offset). */
+function smsDaysInOrder(days: CampaignDay[]): CampaignDay[] {
+  return [...days]
+    .filter(d => d.action === 'sms' && d.times.length > 0)
+    .sort((a, b) => a.day_offset - b.day_offset)
+}
+
 export default function SettingsPage() {
   const supabase = createClient()
 
@@ -42,6 +49,7 @@ export default function SettingsPage() {
     country_code: '',
   })
   const [days, setDays] = useState<CampaignDay[]>([])
+  const [smsTemplates, setSmsTemplates] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState<{ message: string; type: StatusType }>({
@@ -114,6 +122,17 @@ export default function SettingsPage() {
           // Default: one empty day
           setDays([{ day_offset: 0, action: 'none', times: [] }])
         }
+
+        const rawSms = data.campaign_settings?.sms_templates
+        if (rawSms && typeof rawSms === 'object' && !Array.isArray(rawSms)) {
+          setSmsTemplates(
+            Object.fromEntries(
+              Object.entries(rawSms).filter(([, v]) => typeof v === 'string')
+            ) as Record<string, string>
+          )
+        } else {
+          setSmsTemplates({})
+        }
       } catch (err) {
         setStatus({
           message: err instanceof Error ? err.message : 'Unexpected error loading profile.',
@@ -154,6 +173,15 @@ export default function SettingsPage() {
     }))
   }
 
+  const smsSlotKeys = useMemo(() => {
+    const n = smsDaysInOrder(days).length
+    return Array.from({ length: n }, (_, i) => `SMS Template #${i + 1}`)
+  }, [days])
+
+  const updateSmsTemplate = (key: string, value: string) => {
+    setSmsTemplates(prev => ({ ...prev, [key]: value }))
+  }
+
   // ────────────────────────────────────────────────
   // Save handler
   // ────────────────────────────────────────────────
@@ -179,12 +207,21 @@ export default function SettingsPage() {
         }
       })
 
-    const campaignSettingsToSave = dailySchedule.length > 0
-      ? {
-          total_days: Math.max(...days.map(d => d.day_offset)) + 1,
-          daily_schedule: dailySchedule,
-        }
-      : null
+    const smsDaysOrdered = smsDaysInOrder(days)
+    const sms_templates: Record<string, string> = {}
+    smsDaysOrdered.forEach((_, idx) => {
+      const key = `sms_${idx + 1}`
+      sms_templates[key] = (smsTemplates[key] ?? '').trim()
+    })
+
+    const campaignSettingsToSave =
+      dailySchedule.length > 0
+        ? {
+            total_days: Math.max(...days.map(d => d.day_offset)) + 1,
+            daily_schedule: dailySchedule,
+            ...(Object.keys(sms_templates).length > 0 ? { sms_templates } : {}),
+          }
+        : null
 
     try {
       const { error } = await supabase
@@ -277,77 +314,82 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* Main form */}
+        {/* Profile Details */}
         {profile && (
-          <div className="p-6 space-y-8 bg-white border shadow-sm rounded-xl border-slate-200">
-            {/* Profile Details */}
-            <div>
-              <h2 className="mb-5 text-sm font-semibold tracking-wide uppercase text-slate-500">
-                Profile Details
-              </h2>
-              <div className="space-y-5">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-slate-700">Name</label>
-                  <input
-                    type="text"
-                    className="w-full px-3 py-2 text-sm border rounded-lg border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
-                    value={form.name}
-                    onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                    disabled={saving}
-                  />
-                </div>
+          <div className="p-6 mb-6 bg-white border shadow-sm rounded-xl border-slate-200">
+            <h2 className="mb-5 text-sm font-semibold tracking-wide uppercase text-slate-500">
+              Profile Details
+            </h2>
+            <div className="space-y-5">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-slate-700">Name</label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 text-sm border rounded-lg border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+                  value={form.name}
+                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                  disabled={saving}
+                />
+              </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-slate-700">Timezone</label>
-                  <input
-                    type="text"
-                    className="w-full px-3 py-2 text-sm border rounded-lg border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
-                    placeholder="e.g. Asia/Manila"
-                    value={form.timezone}
-                    onChange={e => setForm(f => ({ ...f, timezone: e.target.value }))}
-                    disabled={saving}
-                  />
-                </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-slate-700">Timezone</label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 text-sm border rounded-lg border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+                  placeholder="e.g. Asia/Manila"
+                  value={form.timezone}
+                  onChange={e => setForm(f => ({ ...f, timezone: e.target.value }))}
+                  disabled={saving}
+                />
+              </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-slate-700">Country Code</label>
-                  <input
-                    type="text"
-                    className="w-full px-3 py-2 text-sm border rounded-lg border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
-                    placeholder="e.g. +63"
-                    value={form.country_code}
-                    onChange={e => setForm(f => ({ ...f, country_code: e.target.value }))}
-                    disabled={saving}
-                  />
-                </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-slate-700">Country Code</label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 text-sm border rounded-lg border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+                  placeholder="e.g. +63"
+                  value={form.country_code}
+                  onChange={e => setForm(f => ({ ...f, country_code: e.target.value }))}
+                  disabled={saving}
+                />
+              </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-slate-700">VAPI Assistant ID</label>
-                  <input
-                    type="text"
-                    className="w-full px-3 py-2 font-mono text-sm border rounded-lg border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
-                    value={form.vapi_assistant_id}
-                    onChange={e => setForm(f => ({ ...f, vapi_assistant_id: e.target.value }))}
-                    disabled={saving}
-                  />
-                </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-slate-700">VAPI Assistant ID</label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 font-mono text-sm border rounded-lg border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+                  value={form.vapi_assistant_id}
+                  onChange={e => setForm(f => ({ ...f, vapi_assistant_id: e.target.value }))}
+                  disabled={saving}
+                />
               </div>
             </div>
+          </div>
+        )}
 
-            {/* Campaign Settings */}
-            <div className="pt-6 border-t border-slate-200">
-              <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase text-slate-500">
-                Campaign Settings
-              </h2>
-              <p className="mb-4 text-sm text-slate-600">
-                Define what happens each day of the campaign (Day 1 = campaign start date).
-              </p>
+        {/* Campaign Settings */}
+        {profile && (
+          <div className="p-6 mb-6 bg-white border shadow-sm rounded-xl border-slate-200">
+            <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase text-slate-500">
+              Campaign Settings
+            </h2>
+            <p className="mb-4 text-sm text-slate-600">
+              Define what happens each day of the campaign (Day 1 = campaign start date). SMS
+              template order follows SMS days from earliest to latest day.
+            </p>
 
-              <div className="space-y-6">
+            <div className="space-y-6">
+              {/* ~2 day cards tall, then scroll */}
+              <div
+                className="max-h-[min(34rem,52vh)] overflow-y-auto overscroll-y-contain space-y-6 pr-1 rounded-xl border border-slate-200 bg-slate-50/50 p-3 sm:p-4 [scrollbar-gutter:stable]"
+              >
                 {days.map((day, index) => (
                   <div
                     key={index}
-                    className="p-5 border border-slate-200 rounded-xl bg-slate-50"
+                    className="p-5 border border-slate-200 rounded-xl bg-white shadow-sm"
                   >
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-base font-medium text-slate-800">
@@ -364,7 +406,6 @@ export default function SettingsPage() {
                     </div>
 
                     <div className="space-y-5">
-                      {/* Action */}
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1.5">
                           Action
@@ -378,11 +419,9 @@ export default function SettingsPage() {
                           <option value="none">Do nothing</option>
                           <option value="call">Call only</option>
                           <option value="sms">SMS only</option>
-                          {/* <option value="both">Call and SMS</option> */}
                         </select>
                       </div>
 
-                      {/* Times */}
                       {day.action !== 'none' && (
                         <div>
                           <label className="block text-sm font-medium text-slate-700 mb-1.5">
@@ -407,23 +446,49 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 ))}
-
-                {/* Add Day */}
-                <button
-                  type="button"
-                  onClick={addDay}
-                  className="w-full py-3 text-sm font-medium text-blue-600 transition border-2 border-blue-300 border-dashed rounded-xl hover:bg-blue-50 disabled:opacity-50"
-                  disabled={saving}
-                >
-                  + Add Next Day
-                </button>
               </div>
-            </div>
 
-            {/* Status */}
+              <button
+                type="button"
+                onClick={addDay}
+                className="w-full py-3 text-sm font-medium text-blue-600 transition border-2 border-blue-300 border-dashed rounded-xl hover:bg-blue-50 disabled:opacity-50"
+                disabled={saving}
+              >
+                + Add Next Day
+              </button>
+
+              {smsSlotKeys.length > 0 && (
+                <div className="p-5 border border-slate-200 rounded-xl bg-slate-50 space-y-4">
+                  <h3 className="text-base font-medium text-slate-800">SMS templates</h3>
+                  <p className="text-sm text-slate-600">
+                    First SMS day uses <span className="font-mono text-slate-800">SMS Template 1</span>,
+                    second SMS day <span className="font-mono text-slate-800">SMS Template 2</span>, and
+                    so on.
+                  </p>
+                  {smsSlotKeys.map(key => (
+                    <div key={key} className="flex flex-col gap-1.5">
+                      <label className="text-sm font-medium text-slate-700">{key}</label>
+                      <textarea
+                        rows={3}
+                        className="w-full px-3 py-2 text-sm border rounded-lg border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 resize-y min-h-[4.5rem]"
+                        placeholder="Message body for this SMS send..."
+                        value={smsTemplates[key] ?? ''}
+                        onChange={e => updateSmsTemplate(key, e.target.value)}
+                        disabled={saving}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {profile && (
+          <>
             {status.type && (
               <div
-                className={`mt-8 rounded-lg border px-4 py-3 text-sm ${
+                className={`mb-6 rounded-lg border px-4 py-3 text-sm ${
                   status.type === 'success'
                     ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
                     : 'border-red-300 bg-red-50 text-red-800'
@@ -433,8 +498,7 @@ export default function SettingsPage() {
               </div>
             )}
 
-            {/* Save */}
-            <div className="flex justify-end mt-8">
+            <div className="flex justify-end">
               <button
                 type="button"
                 onClick={handleSave}
@@ -444,7 +508,7 @@ export default function SettingsPage() {
                 {saving ? 'Saving...' : 'Save All Changes'}
               </button>
             </div>
-          </div>
+          </>
         )}
       </div>
       </main>
