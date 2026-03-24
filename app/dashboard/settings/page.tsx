@@ -173,9 +173,10 @@ export default function SettingsPage() {
     }))
   }
 
+  /** Canonical keys must match DB/API (`sms_1`, `sms_2`, …), not display labels. */
   const smsSlotKeys = useMemo(() => {
     const n = smsDaysInOrder(days).length
-    return Array.from({ length: n }, (_, i) => `SMS Template #${i + 1}`)
+    return Array.from({ length: n }, (_, i) => `sms_${i + 1}`)
   }, [days])
 
   const updateSmsTemplate = (key: string, value: string) => {
@@ -465,9 +466,11 @@ export default function SettingsPage() {
                     second SMS day <span className="font-mono text-slate-800">SMS Template 2</span>, and
                     so on.
                   </p>
-                  {smsSlotKeys.map(key => (
+                  {smsSlotKeys.map((key, i) => (
                     <div key={key} className="flex flex-col gap-1.5">
-                      <label className="text-sm font-medium text-slate-700">{key}</label>
+                      <label className="text-sm font-medium text-slate-700">
+                        SMS Template #{i + 1}
+                      </label>
                       <textarea
                         rows={3}
                         className="w-full px-3 py-2 text-sm border rounded-lg border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 resize-y min-h-[4.5rem]"
