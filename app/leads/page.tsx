@@ -44,7 +44,8 @@ export default function LeadsPage() {
   const [editingLead, setEditingLead] = useState<Lead | null>(null)
   const [editForm, setEditForm] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
-  const [updatingPhone, setUpdatingPhone] = useState<string | null>(null)
+  const [selectedPhones, setSelectedPhones] = useState<Set<string>>(() => new Set())
+  const [bulkUpdating, setBulkUpdating] = useState(false)
 
   const fetchLeads = useCallback(async () => {
     setLoading(true)
@@ -65,33 +66,98 @@ export default function LeadsPage() {
     fetchLeads()
   }, [fetchLeads])
 
-  // Toggle Active/Inactive by updating Call Status
-  const handleToggleStatus = async (lead: Lead) => {
-    const phone = lead['Phone Number']
-    if (!phone) return
-    setUpdatingPhone(phone)
-
-    const active = isLeadActive(lead)
-    const newStatus = active ? 'Complete' : 'Scheduled'
-
-    try {
-      const res = await fetch(N8N_UPDATE_LEAD_URL, {
-        method: 'POST',
-        mode: 'cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phoneNumber: phone,
-          updates: { 'Call Status': newStatus }
-        })
+  const updateLeadCallStatus = async (phone: string, newStatus: string): Promise<boolean> => {
+    const res = await fetch(N8N_UPDATE_LEAD_URL, {
+      method: 'POST',
+      mode: 'cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phoneNumber: phone,
+        updates: { 'Call Status': newStatus }
       })
-      if (!res.ok) throw new Error('Update failed')
-      setLeads(prev => prev.map(l =>
-        l['Phone Number'] === phone ? { ...l, 'Call Status': newStatus } : l
-      ))
+    })
+    return res.ok
+  }
+
+  const togglePhoneSelected = (phone: string) => {
+    if (!phone) return
+    setSelectedPhones(prev => {
+      const next = new Set(prev)
+      if (next.has(phone)) next.delete(phone)
+      else next.add(phone)
+      return next
+    })
+  }
+
+  const clearSelection = () => setSelectedPhones(new Set())
+
+  const handleBulkActivate = async () => {
+    const phones = Array.from(selectedPhones)
+    const toActivate = phones.filter(phone => {
+      const lead = leads.find(l => l['Phone Number'] === phone)
+      return lead && !isLeadActive(lead)
+    })
+    if (toActivate.length === 0) {
+      alert('No inactive leads in the current selection.')
+      return
+    }
+    setBulkUpdating(true)
+    try {
+      const failures: string[] = []
+      for (const phone of toActivate) {
+        const ok = await updateLeadCallStatus(phone, 'Scheduled')
+        if (!ok) failures.push(phone)
+        else {
+          setLeads(prev =>
+            prev.map(l =>
+              l['Phone Number'] === phone ? { ...l, 'Call Status': 'Scheduled' } : l
+            )
+          )
+        }
+      }
+      if (failures.length) {
+        alert(`Failed to activate ${failures.length} lead(s). Others were updated.`)
+      }
+      clearSelection()
     } catch {
-      alert('Failed to update status. Please try again.')
+      alert('Bulk activation failed. Please try again.')
     } finally {
-      setUpdatingPhone(null)
+      setBulkUpdating(false)
+    }
+  }
+
+  const handleBulkDeactivate = async () => {
+    const phones = Array.from(selectedPhones)
+    const toDeactivate = phones.filter(phone => {
+      const lead = leads.find(l => l['Phone Number'] === phone)
+      return lead && isLeadActive(lead)
+    })
+    if (toDeactivate.length === 0) {
+      alert('No active leads in the current selection.')
+      return
+    }
+    setBulkUpdating(true)
+    try {
+      const failures: string[] = []
+      for (const phone of toDeactivate) {
+        const ok = await updateLeadCallStatus(phone, 'Complete')
+        if (!ok) failures.push(phone)
+        else {
+          setLeads(prev =>
+            prev.map(l =>
+              l['Phone Number'] === phone ? { ...l, 'Call Status': 'Complete' } : l
+            )
+          )
+        }
+      }
+      if (failures.length) {
+        alert(`Failed to deactivate ${failures.length} lead(s). Others were updated.`)
+      }
+      clearSelection()
+    } catch {
+      alert('Bulk deactivation failed. Please try again.')
+    } finally {
+      setBulkUpdating(false)
     }
   }
 
@@ -176,6 +242,25 @@ export default function LeadsPage() {
     const dateB = parseDateValue(b['Campaign Date'] || '')
     return sortDir === 'desc' ? dateB - dateA : dateA - dateB
   })
+
+  const visiblePhones = filteredLeads
+    .map(l => String(l['Phone Number'] || '').trim())
+    .filter(Boolean)
+  const allVisibleSelected =
+    visiblePhones.length > 0 && visiblePhones.every(p => selectedPhones.has(p))
+
+  const toggleSelectAllVisible = () => {
+    setSelectedPhones(prev => {
+      if (allVisibleSelected) {
+        const next = new Set(prev)
+        visiblePhones.forEach(p => next.delete(p))
+        return next
+      }
+      const next = new Set(prev)
+      visiblePhones.forEach(p => next.add(p))
+      return next
+    })
+  }
 
   const hotLeads = leads.filter(isHotLead)
   const activeCount = leads.filter(isLeadActive).length
@@ -265,9 +350,53 @@ export default function LeadsPage() {
 
       {!loading && !error && (
         <div className="leads-table-wrapper">
+          {selectedPhones.size > 0 && (
+            <div className="leads-bulk-bar">
+              <span className="leads-bulk-count">
+                {selectedPhones.size} selected
+              </span>
+              <div className="leads-bulk-actions">
+                <button
+                  type="button"
+                  className="btn-bulk btn-bulk-activate"
+                  onClick={handleBulkActivate}
+                  disabled={bulkUpdating}
+                >
+                  {bulkUpdating ? 'Working…' : 'Activate'}
+                </button>
+                <button
+                  type="button"
+                  className="btn-bulk btn-bulk-deactivate"
+                  onClick={handleBulkDeactivate}
+                  disabled={bulkUpdating}
+                >
+                  {bulkUpdating ? 'Working…' : 'Deactivate'}
+                </button>
+                <button
+                  type="button"
+                  className="btn-bulk btn-bulk-clear"
+                  onClick={clearSelection}
+                  disabled={bulkUpdating}
+                >
+                  Clear selection
+                </button>
+              </div>
+            </div>
+          )}
           <table className="leads-table">
             <thead>
               <tr>
+                <th className="th-checkbox">
+                  <input
+                    type="checkbox"
+                    className="lead-row-checkbox"
+                    checked={allVisibleSelected}
+                    onChange={toggleSelectAllVisible}
+                    disabled={visiblePhones.length === 0}
+                    title="Select all visible rows"
+                    aria-label="Select all visible rows"
+                  />
+                </th>
                 <th>#</th>
                 <th>Name</th>
                 <th>Phone</th>
@@ -287,7 +416,7 @@ export default function LeadsPage() {
             <tbody>
               {filteredLeads.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="empty-row">
+                  <td colSpan={9} className="empty-row">
                     {search ? 'No leads match your search' : 'No leads found'}
                   </td>
                 </tr>
@@ -295,9 +424,20 @@ export default function LeadsPage() {
                 filteredLeads.map((lead, i) => {
                   const active = isLeadActive(lead)
                   const callsUsed = CALL_SLOTS.filter(slot => (lead[slot] || '').trim() !== '').length
-                  const isUpdating = updatingPhone === lead['Phone Number']
+                  const phone = String(lead['Phone Number'] || '').trim()
+                  const rowSelected = phone ? selectedPhones.has(phone) : false
                   return (
-                    <tr key={i} className={active ? '' : 'row-inactive'}>
+                    <tr key={phone || i} className={active ? '' : 'row-inactive'}>
+                      <td className="checkbox-cell">
+                        <input
+                          type="checkbox"
+                          className="lead-row-checkbox"
+                          checked={rowSelected}
+                          onChange={() => togglePhoneSelected(phone)}
+                          disabled={!phone}
+                          aria-label={`Select lead ${`${lead['First Name'] || ''} ${lead['Last Name'] || ''}`.trim() || phone || 'row'}`}
+                        />
+                      </td>
                       <td>{i + 1}</td>
                       <td className="name-cell">
                         {`${lead['First Name'] || ''} ${lead['Last Name'] || ''}`.trim() || '-'}
@@ -313,13 +453,7 @@ export default function LeadsPage() {
                       </td>
                       <td className="actions-cell">
                         <button
-                          className={`btn-action ${active ? 'btn-deactivate' : 'btn-activate'}`}
-                          onClick={() => handleToggleStatus(lead)}
-                          disabled={isUpdating}
-                        >
-                          {isUpdating ? '...' : active ? 'Deactivate' : 'Activate'}
-                        </button>
-                        <button
+                          type="button"
                           className="btn-action btn-edit"
                           onClick={() => handleEdit(lead)}
                         >
