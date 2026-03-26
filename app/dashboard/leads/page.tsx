@@ -36,7 +36,6 @@ export default function DashboardLeadsPage() {
     activeCount,
     inactiveCount,
     hotLeads,
-    handleToggleStatus,
     editingLead,
     setEditingLead,
     editForm,
@@ -44,7 +43,15 @@ export default function DashboardLeadsPage() {
     handleSaveEdit,
     updateEditField,
     saving,
-    updatingPhone,
+    selectedPhones,
+    visiblePhones,
+    allVisibleSelected,
+    bulkUpdating,
+    togglePhoneSelected,
+    toggleSelectAllVisible,
+    clearSelection,
+    handleBulkActivate,
+    handleBulkDeactivate,
     isLeadActive,
   } = useLeads()
 
@@ -115,9 +122,16 @@ export default function DashboardLeadsPage() {
           onToggleTag={onToggleTag}
           onCreateTag={onCreateTag}
           onDeleteTag={deleteTag}
-          onToggleStatus={handleToggleStatus}
           onEdit={handleEdit}
-          updatingPhone={updatingPhone}
+          selectedPhones={selectedPhones}
+          visiblePhones={visiblePhones}
+          allVisibleSelected={allVisibleSelected}
+          bulkUpdating={bulkUpdating}
+          onTogglePhoneSelected={togglePhoneSelected}
+          onToggleSelectAllVisible={toggleSelectAllVisible}
+          onClearSelection={clearSelection}
+          onBulkActivate={handleBulkActivate}
+          onBulkDeactivate={handleBulkDeactivate}
           isLeadActive={isLeadActive}
         />
       )}

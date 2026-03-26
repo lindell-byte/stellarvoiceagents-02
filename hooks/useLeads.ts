@@ -31,7 +31,10 @@ export function useLeads() {
   const [editingLead, setEditingLead] = useState<Lead | null>(null)
   const [editForm, setEditForm] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
-  const [updatingPhone, setUpdatingPhone] = useState<string | null>(null)
+  const [selectedPhones, setSelectedPhones] = useState<Set<string>>(
+    () => new Set()
+  )
+  const [bulkUpdating, setBulkUpdating] = useState(false)
 
   // Resolve client_id once on mount
   useEffect(() => {
@@ -72,33 +75,22 @@ export function useLeads() {
     fetchLeads()
   }, [fetchLeads])
 
-  const handleToggleStatus = useCallback(
-    async (lead: Lead) => {
-      const phone = lead['Phone Number']
-      if (!phone) return
-      setUpdatingPhone(phone)
-      const active = isLeadActive(lead)
-      const newStatus = active ? 'Complete' : 'Scheduled'
-      try {
-        const { error } = await supabase
-          .from('leads')
-          .update({ call_status: newStatus })
-          .eq('phone_number', phone)
-          .eq('client_id', clientId)
+  const updateLeadStatusByPhone = useCallback(
+    async (phone: string, newStatus: string): Promise<boolean> => {
+      const { error } = await supabase
+        .from('leads')
+        .update({ call_status: newStatus })
+        .eq('phone_number', phone)
+        .eq('client_id', clientId)
 
-        if (error) throw error
+      if (error) return false
 
-        setLeads(prev =>
-          prev.map(l =>
-            l['Phone Number'] === phone ? { ...l, 'Call Status': newStatus } : l
-          )
+      setLeads((prev) =>
+        prev.map((l) =>
+          l['Phone Number'] === phone ? { ...l, 'Call Status': newStatus } : l
         )
-      } catch (err) {
-        console.error('Failed to update status via Supabase', err)
-        alert('Failed to update status. Please try again.')
-      } finally {
-        setUpdatingPhone(null)
-      }
+      )
+      return true
     },
     [clientId, supabase]
   )
@@ -194,6 +186,100 @@ export function useLeads() {
       return sortDir === 'desc' ? dateB - dateA : dateA - dateB
     })
 
+  const visiblePhones = filteredLeads
+    .map((lead) => String(lead['Phone Number'] || '').trim())
+    .filter(Boolean)
+  const allVisibleSelected =
+    visiblePhones.length > 0 && visiblePhones.every((phone) => selectedPhones.has(phone))
+
+  const togglePhoneSelected = useCallback((phone: string) => {
+    if (!phone) return
+    setSelectedPhones((prev) => {
+      const next = new Set(prev)
+      if (next.has(phone)) next.delete(phone)
+      else next.add(phone)
+      return next
+    })
+  }, [])
+
+  const toggleSelectAllVisible = useCallback(() => {
+    setSelectedPhones((prev) => {
+      const next = new Set(prev)
+      if (allVisibleSelected) {
+        visiblePhones.forEach((phone) => next.delete(phone))
+      } else {
+        visiblePhones.forEach((phone) => next.add(phone))
+      }
+      return next
+    })
+  }, [allVisibleSelected, visiblePhones])
+
+  const clearSelection = useCallback(() => {
+    setSelectedPhones(new Set())
+  }, [])
+
+  const handleBulkActivate = useCallback(async () => {
+    const phones = Array.from(selectedPhones)
+    const toActivate = phones.filter((phone) => {
+      const lead = leads.find((l) => l['Phone Number'] === phone)
+      return lead && !isLeadActive(lead)
+    })
+
+    if (toActivate.length === 0) {
+      alert('No inactive leads in the current selection.')
+      return
+    }
+
+    setBulkUpdating(true)
+    try {
+      const failures: string[] = []
+      for (const phone of toActivate) {
+        const ok = await updateLeadStatusByPhone(phone, 'Scheduled')
+        if (!ok) failures.push(phone)
+      }
+      if (failures.length > 0) {
+        alert(`Failed to activate ${failures.length} lead(s). Others were updated.`)
+      }
+      clearSelection()
+    } catch (err) {
+      console.error('Bulk activate failed', err)
+      alert('Bulk activation failed. Please try again.')
+    } finally {
+      setBulkUpdating(false)
+    }
+  }, [clearSelection, leads, selectedPhones, updateLeadStatusByPhone])
+
+  const handleBulkDeactivate = useCallback(async () => {
+    const phones = Array.from(selectedPhones)
+    const toDeactivate = phones.filter((phone) => {
+      const lead = leads.find((l) => l['Phone Number'] === phone)
+      return lead && isLeadActive(lead)
+    })
+
+    if (toDeactivate.length === 0) {
+      alert('No active leads in the current selection.')
+      return
+    }
+
+    setBulkUpdating(true)
+    try {
+      const failures: string[] = []
+      for (const phone of toDeactivate) {
+        const ok = await updateLeadStatusByPhone(phone, 'Complete')
+        if (!ok) failures.push(phone)
+      }
+      if (failures.length > 0) {
+        alert(`Failed to deactivate ${failures.length} lead(s). Others were updated.`)
+      }
+      clearSelection()
+    } catch (err) {
+      console.error('Bulk deactivate failed', err)
+      alert('Bulk deactivation failed. Please try again.')
+    } finally {
+      setBulkUpdating(false)
+    }
+  }, [clearSelection, leads, selectedPhones, updateLeadStatusByPhone])
+
   const hotLeads = leads.filter(isHotLead)
   const activeCount = leads.filter(isLeadActive).length
   const inactiveCount = leads.length - activeCount - hotLeads.length
@@ -215,7 +301,6 @@ export function useLeads() {
     activeCount,
     inactiveCount,
     hotLeads,
-    handleToggleStatus,
     editingLead,
     setEditingLead,
     editForm,
@@ -223,7 +308,15 @@ export function useLeads() {
     handleSaveEdit,
     updateEditField,
     saving,
-    updatingPhone,
+    selectedPhones,
+    visiblePhones,
+    allVisibleSelected,
+    bulkUpdating,
+    togglePhoneSelected,
+    toggleSelectAllVisible,
+    clearSelection,
+    handleBulkActivate,
+    handleBulkDeactivate,
     isLeadActive,
   }
 }
