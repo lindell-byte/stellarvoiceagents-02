@@ -2,6 +2,10 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import {
+  SMS_TEMPLATE_PLACEHOLDER_TOKENS,
+  applySmsTemplatePlaceholders,
+} from '@/lib/sms-template-placeholders'
 
 type ClientProfile = {
   id: string
@@ -181,6 +185,14 @@ export default function SettingsPage() {
 
   const updateSmsTemplate = (key: string, value: string) => {
     setSmsTemplates(prev => ({ ...prev, [key]: value }))
+  }
+
+  const appendPlaceholder = (smsKey: string, token: string) => {
+    setSmsTemplates(prev => {
+      const cur = prev[smsKey] ?? ''
+      const needsSpace = cur.length > 0 && !/\s$/.test(cur)
+      return { ...prev, [smsKey]: cur + (needsSpace ? ' ' : '') + token }
+    })
   }
 
   // ────────────────────────────────────────────────
@@ -464,7 +476,10 @@ export default function SettingsPage() {
                   <p className="text-sm text-slate-600">
                     First SMS day uses <span className="font-mono text-slate-800">SMS Template 1</span>,
                     second SMS day <span className="font-mono text-slate-800">SMS Template 2</span>, and
-                    so on.
+                    so on. Use placeholders for values filled per lead when the message is sent:{' '}
+                    <span className="font-mono text-slate-800">[lead_name]</span>,{' '}
+                    <span className="font-mono text-slate-800">[name]</span>,{' '}
+                    <span className="font-mono text-slate-800">[company]</span>.
                   </p>
                   {smsSlotKeys.map((key, i) => (
                     <div key={key} className="flex flex-col gap-1.5">
@@ -479,6 +494,32 @@ export default function SettingsPage() {
                         onChange={e => updateSmsTemplate(key, e.target.value)}
                         disabled={saving}
                       />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-medium text-slate-500">Insert</span>
+                        {SMS_TEMPLATE_PLACEHOLDER_TOKENS.map(token => (
+                          <button
+                            key={`${key}-${token}`}
+                            type="button"
+                            onClick={() => appendPlaceholder(key, token)}
+                            disabled={saving}
+                            className="rounded-md border border-slate-200 bg-white px-2 py-1 font-mono text-xs text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                          >
+                            {token}
+                          </button>
+                        ))}
+                      </div>
+                      {(smsTemplates[key] ?? '').trim() !== '' && (
+                        <p className="text-xs text-slate-500">
+                          Preview:{' '}
+                          <span className="text-slate-700">
+                            {applySmsTemplatePlaceholders(smsTemplates[key] ?? '', {
+                              lead_name: 'Alex',
+                              name: form.name.trim() || 'Your name',
+                              company: 'Your company',
+                            })}
+                          </span>
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>
