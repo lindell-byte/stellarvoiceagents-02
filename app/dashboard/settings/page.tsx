@@ -35,13 +35,6 @@ const availableTimes = [
   '18:00', '19:00', '20:00'
 ]
 
-/** SMS days in schedule order → sms_1, sms_2, … (by day_offset). */
-function smsDaysInOrder(days: CampaignDay[]): CampaignDay[] {
-  return [...days]
-    .filter(d => d.action === 'sms' && d.times.length > 0)
-    .sort((a, b) => a.day_offset - b.day_offset)
-}
-
 export default function SettingsPage() {
   const supabase = createClient()
 
@@ -177,11 +170,17 @@ export default function SettingsPage() {
     }))
   }
 
-  /** Canonical keys must match DB/API (`sms_1`, `sms_2`, …), not display labels. */
-  const smsSlotKeys = useMemo(() => {
-    const n = smsDaysInOrder(days).length
-    return Array.from({ length: n }, (_, i) => `sms_${i + 1}`)
-  }, [days])
+  /** Only keys present in `campaign_settings.sms_templates` (sorted: sms_1, sms_2, …). */
+  const smsSlotKeys = useMemo(
+    () =>
+      Object.keys(smsTemplates)
+        .filter(k => /^sms_\d+$/.test(k))
+        .sort(
+          (a, b) =>
+            Number(a.replace(/^sms_/, '')) - Number(b.replace(/^sms_/, ''))
+        ),
+    [smsTemplates]
+  )
 
   const updateSmsTemplate = (key: string, value: string) => {
     setSmsTemplates(prev => ({ ...prev, [key]: value }))
@@ -220,12 +219,10 @@ export default function SettingsPage() {
         }
       })
 
-    const smsDaysOrdered = smsDaysInOrder(days)
     const sms_templates: Record<string, string> = {}
-    smsDaysOrdered.forEach((_, idx) => {
-      const key = `sms_${idx + 1}`
+    for (const key of smsSlotKeys) {
       sms_templates[key] = (smsTemplates[key] ?? '').trim()
-    })
+    }
 
     const campaignSettingsToSave =
       dailySchedule.length > 0
@@ -391,7 +388,8 @@ export default function SettingsPage() {
             </h2>
             <p className="mb-4 text-sm text-slate-600">
               Define what happens each day of the campaign (Day 1 = campaign start date). SMS
-              template order follows SMS days from earliest to latest day.
+              message bodies come from <span className="font-mono">campaign_settings.sms_templates</span>{' '}
+              (only keys saved in Supabase are shown below).
             </p>
 
             <div className="space-y-6">
@@ -474,17 +472,16 @@ export default function SettingsPage() {
                 <div className="p-5 border border-slate-200 rounded-xl bg-slate-50 space-y-4">
                   <h3 className="text-base font-medium text-slate-800">SMS templates</h3>
                   <p className="text-sm text-slate-600">
-                    First SMS day uses <span className="font-mono text-slate-800">SMS Template 1</span>,
-                    second SMS day <span className="font-mono text-slate-800">SMS Template 2</span>, and
-                    so on. Use placeholders for values filled per lead when the message is sent:{' '}
+                    Your automation maps each SMS send to an <span className="font-mono">sms_*</span> key.
+                    Use placeholders for values filled per lead when the message is sent:{' '}
                     <span className="font-mono text-slate-800">[lead_name]</span>,{' '}
                     <span className="font-mono text-slate-800">[name]</span>,{' '}
                     <span className="font-mono text-slate-800">[company]</span>.
                   </p>
-                  {smsSlotKeys.map((key, i) => (
+                  {smsSlotKeys.map(key => (
                     <div key={key} className="flex flex-col gap-1.5">
-                      <label className="text-sm font-medium text-slate-700">
-                        SMS Template #{i + 1}
+                      <label className="text-sm font-medium text-slate-700 font-mono">
+                        {key}
                       </label>
                       <textarea
                         rows={3}
