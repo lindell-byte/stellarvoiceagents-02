@@ -148,9 +148,12 @@ export function LeadsTable({
               const phone = String(lead['Phone Number'] || '').trim()
               const rowSelected = phone ? selectedPhones.has(phone) : false
               const selectedTags = getSelectedTagsForLead(lead)
+              const rowKey =
+                String(lead.id || '').trim() ||
+                (phone ? `${phone}:${i}` : `lead-row-${i}`)
               return (
                 <tr
-                  key={phone || i}
+                  key={rowKey}
                   className={`border-t border-slate-100 ${
                     active ? '' : 'opacity-60 hover:opacity-85'
                   } hover:bg-slate-50`}
