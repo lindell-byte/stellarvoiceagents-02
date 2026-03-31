@@ -28,11 +28,11 @@ type CampaignDay = {
   times: string[]             // e.g. ["08:00", "12:00"]
 }
 
-// Available time slots (customize as needed)
+// Available time slots (used when Campaign Settings UI is re-enabled)
 const availableTimes = [
   '08:00', '09:00', '10:00', '11:00', '12:00',
   '13:00', '14:00', '15:00', '16:00', '17:00',
-  '18:00', '19:00', '20:00'
+  '18:00', '19:00', '20:00',
 ]
 
 export default function SettingsPage() {
@@ -144,7 +144,7 @@ export default function SettingsPage() {
   }, [])
 
   // ────────────────────────────────────────────────
-  // Day management helpers
+  // Day management helpers (unused while Campaign Settings UI is commented out)
   // ────────────────────────────────────────────────
   const addDay = () => {
     const newOffset = days.length > 0 ? days[days.length - 1].day_offset + 1 : 0
@@ -152,7 +152,7 @@ export default function SettingsPage() {
   }
 
   const removeDay = (index: number) => {
-    if (days.length <= 1) return // keep at least one day
+    if (days.length <= 1) return
     setDays(days.filter((_, i) => i !== index))
   }
 
@@ -380,150 +380,152 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* Campaign Settings */}
-        {profile && (
-          <div className="p-6 mb-6 bg-white border shadow-sm rounded-xl border-slate-200">
-            <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase text-slate-500">
-              Campaign Settings
-            </h2>
-            <p className="mb-4 text-sm text-slate-600">
-              Define what happens each day of the campaign (Day 1 = campaign start date). SMS
-              message bodies come from <span className="font-mono">campaign_settings.sms_templates</span>{' '}
-              (only keys saved in Supabase are shown below).
-            </p>
+        {/* Campaign Settings — hidden for now; set `true` below to re-enable */}
+        {false &&
+          profile && (
+            <div className="p-6 mb-6 bg-white border shadow-sm rounded-xl border-slate-200">
+              <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase text-slate-500">
+                Campaign Settings
+              </h2>
+              <p className="mb-4 text-sm text-slate-600">
+                Define what happens each day of the campaign (Day 1 = campaign start date). SMS
+                message bodies come from{' '}
+                <span className="font-mono">campaign_settings.sms_templates</span>{' '}
+                (only keys saved in Supabase are shown below).
+              </p>
 
-            <div className="space-y-6">
-              {/* ~2 day cards tall, then scroll */}
-              <div
-                className="max-h-[min(34rem,52vh)] overflow-y-auto overscroll-y-contain space-y-6 pr-1 rounded-xl border border-slate-200 bg-slate-50/50 p-3 sm:p-4 [scrollbar-gutter:stable]"
-              >
-                {days.map((day, index) => (
-                  <div
-                    key={index}
-                    className="p-5 border border-slate-200 rounded-xl bg-white shadow-sm"
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-base font-medium text-slate-800">
-                        Day {day.day_offset + 1}
-                      </h3>
-                      <button
-                        type="button"
-                        onClick={() => removeDay(index)}
-                        className="text-sm text-red-600 hover:text-red-800 disabled:opacity-50"
-                        disabled={saving || days.length <= 1}
-                      >
-                        Remove
-                      </button>
-                    </div>
-
-                    <div className="space-y-5">
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                          Action
-                        </label>
-                        <select
-                          value={day.action}
-                          onChange={e => updateDay(index, 'action', e.target.value)}
-                          className="w-full px-3 py-2 text-sm border rounded-lg border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
-                          disabled={saving}
+              <div className="space-y-6">
+                <div
+                  className="max-h-[min(34rem,52vh)] overflow-y-auto overscroll-y-contain space-y-6 pr-1 rounded-xl border border-slate-200 bg-slate-50/50 p-3 sm:p-4 [scrollbar-gutter:stable]"
+                >
+                  {days.map((day, index) => (
+                    <div
+                      key={index}
+                      className="p-5 border border-slate-200 rounded-xl bg-white shadow-sm"
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-base font-medium text-slate-800">
+                          Day {day.day_offset + 1}
+                        </h3>
+                        <button
+                          type="button"
+                          onClick={() => removeDay(index)}
+                          className="text-sm text-red-600 hover:text-red-800 disabled:opacity-50"
+                          disabled={saving || days.length <= 1}
                         >
-                          <option value="none">Do nothing</option>
-                          <option value="call">Call only</option>
-                          <option value="sms">SMS only</option>
-                        </select>
+                          Remove
+                        </button>
                       </div>
 
-                      {day.action !== 'none' && (
+                      <div className="space-y-5">
                         <div>
                           <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                            Times to contact (select one or more)
+                            Action
                           </label>
-                          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                            {availableTimes.map(time => (
-                              <label key={time} className="flex items-center gap-2">
-                                <input
-                                  type="checkbox"
-                                  checked={day.times.includes(time)}
-                                  onChange={() => toggleTime(index, time)}
-                                  disabled={saving}
-                                  className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
-                                />
-                                <span className="text-sm text-slate-700">{time}</span>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <button
-                type="button"
-                onClick={addDay}
-                className="w-full py-3 text-sm font-medium text-blue-600 transition border-2 border-blue-300 border-dashed rounded-xl hover:bg-blue-50 disabled:opacity-50"
-                disabled={saving}
-              >
-                + Add Next Day
-              </button>
-
-              {smsSlotKeys.length > 0 && (
-                <div className="p-5 border border-slate-200 rounded-xl bg-slate-50 space-y-4">
-                  <h3 className="text-base font-medium text-slate-800">SMS templates</h3>
-                  <p className="text-sm text-slate-600">
-                    Your automation maps each SMS send to an <span className="font-mono">sms_*</span> key.
-                    Use placeholders for values filled per lead when the message is sent:{' '}
-                    <span className="font-mono text-slate-800">[lead_name]</span>,{' '}
-                    <span className="font-mono text-slate-800">[name]</span>,{' '}
-                    <span className="font-mono text-slate-800">[company]</span>.
-                  </p>
-                  {smsSlotKeys.map(key => (
-                    <div key={key} className="flex flex-col gap-1.5">
-                      <label className="text-sm font-medium text-slate-700 font-mono">
-                        {key}
-                      </label>
-                      <textarea
-                        rows={3}
-                        className="w-full px-3 py-2 text-sm border rounded-lg border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 resize-y min-h-[4.5rem]"
-                        placeholder="Message body for this SMS send..."
-                        value={smsTemplates[key] ?? ''}
-                        onChange={e => updateSmsTemplate(key, e.target.value)}
-                        disabled={saving}
-                      />
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs font-medium text-slate-500">Insert</span>
-                        {SMS_TEMPLATE_PLACEHOLDER_TOKENS.map(token => (
-                          <button
-                            key={`${key}-${token}`}
-                            type="button"
-                            onClick={() => appendPlaceholder(key, token)}
+                          <select
+                            value={day.action}
+                            onChange={e => updateDay(index, 'action', e.target.value)}
+                            className="w-full px-3 py-2 text-sm border rounded-lg border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
                             disabled={saving}
-                            className="rounded-md border border-slate-200 bg-white px-2 py-1 font-mono text-xs text-slate-700 hover:bg-slate-100 disabled:opacity-50"
                           >
-                            {token}
-                          </button>
-                        ))}
+                            <option value="none">Do nothing</option>
+                            <option value="call">Call only</option>
+                            <option value="sms">SMS only</option>
+                          </select>
+                        </div>
+
+                        {day.action !== 'none' && (
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                              Times to contact (select one or more)
+                            </label>
+                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                              {availableTimes.map(time => (
+                                <label key={time} className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={day.times.includes(time)}
+                                    onChange={() => toggleTime(index, time)}
+                                    disabled={saving}
+                                    className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                                  />
+                                  <span className="text-sm text-slate-700">{time}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      {(smsTemplates[key] ?? '').trim() !== '' && (
-                        <p className="text-xs text-slate-500">
-                          Preview:{' '}
-                          <span className="text-slate-700">
-                            {applySmsTemplatePlaceholders(smsTemplates[key] ?? '', {
-                              lead_name: 'Alex',
-                              name: form.name.trim() || 'Your name',
-                              company: 'Your company',
-                            })}
-                          </span>
-                        </p>
-                      )}
                     </div>
                   ))}
                 </div>
-              )}
+
+                <button
+                  type="button"
+                  onClick={addDay}
+                  className="w-full py-3 text-sm font-medium text-blue-600 transition border-2 border-blue-300 border-dashed rounded-xl hover:bg-blue-50 disabled:opacity-50"
+                  disabled={saving}
+                >
+                  + Add Next Day
+                </button>
+
+                {smsSlotKeys.length > 0 && (
+                  <div className="p-5 border border-slate-200 rounded-xl bg-slate-50 space-y-4">
+                    <h3 className="text-base font-medium text-slate-800">SMS templates</h3>
+                    <p className="text-sm text-slate-600">
+                      Your automation maps each SMS send to an{' '}
+                      <span className="font-mono">sms_*</span> key. Use placeholders for values filled
+                      per lead when the message is sent:{' '}
+                      <span className="font-mono text-slate-800">[lead_name]</span>,{' '}
+                      <span className="font-mono text-slate-800">[name]</span>,{' '}
+                      <span className="font-mono text-slate-800">[company]</span>.
+                    </p>
+                    {smsSlotKeys.map(key => (
+                      <div key={key} className="flex flex-col gap-1.5">
+                        <label className="text-sm font-medium text-slate-700 font-mono">
+                          {key}
+                        </label>
+                        <textarea
+                          rows={3}
+                          className="w-full px-3 py-2 text-sm border rounded-lg border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 resize-y min-h-[4.5rem]"
+                          placeholder="Message body for this SMS send..."
+                          value={smsTemplates[key] ?? ''}
+                          onChange={e => updateSmsTemplate(key, e.target.value)}
+                          disabled={saving}
+                        />
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-xs font-medium text-slate-500">Insert</span>
+                          {SMS_TEMPLATE_PLACEHOLDER_TOKENS.map(token => (
+                            <button
+                              key={`${key}-${token}`}
+                              type="button"
+                              onClick={() => appendPlaceholder(key, token)}
+                              disabled={saving}
+                              className="rounded-md border border-slate-200 bg-white px-2 py-1 font-mono text-xs text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                            >
+                              {token}
+                            </button>
+                          ))}
+                        </div>
+                        {(smsTemplates[key] ?? '').trim() !== '' && (
+                          <p className="text-xs text-slate-500">
+                            Preview:{' '}
+                            <span className="text-slate-700">
+                              {applySmsTemplatePlaceholders(smsTemplates[key] ?? '', {
+                                lead_name: 'Alex',
+                                name: form.name.trim() || 'Your name',
+                                company: 'Your company',
+                              })}
+                            </span>
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
         {profile && (
           <>
