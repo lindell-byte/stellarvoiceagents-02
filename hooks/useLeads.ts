@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   LEADS_API_URL,
   type Lead,
@@ -10,6 +10,9 @@ import {
   isHotLead,
 } from '@/lib/leads-constants'
 import { createClient } from '@/lib/supabase/client'
+
+// ADMIN EMAILS - CAN BE USED TO CHECK CLIENT SITES
+const ADMIN_EMAILS = ['david@mindsheep.com.au', 'rod@mindsheep.com.au']
 
 function parseDateValue(dateStr: string | number): number {
   const str = String(dateStr || '')
@@ -35,6 +38,10 @@ export function useLeads() {
     () => new Set()
   )
   const [bulkUpdating, setBulkUpdating] = useState(false)
+  const isAdminRef = useRef(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [selectedAdminClientId, setSelectedAdminClientId] = useState<string | null>(null)
+  const [allClients, setAllClients] = useState<{ id: string; name: string | null; email: string | null }[]>([])
 
   // Resolve client_id once on mount
   useEffect(() => {
@@ -42,6 +49,20 @@ export function useLeads() {
       try {
         const { data: { user }, error: userError } = await supabase.auth.getUser()
         if (userError || !user?.email) return
+
+        if (ADMIN_EMAILS.includes(user.email.toLowerCase())) {
+          isAdminRef.current = true
+          setIsAdmin(true)
+          // Load all clients for the admin selector
+          const { data } = await supabase
+            .from('clients')
+            .select('id, name, email')
+            .order('name')
+          if (data) setAllClients(data)
+          setLoading(false) // stop loading until admin picks a client
+          return
+        }
+
         const { data, error } = await supabase
           .from('clients')
           .select('id')
@@ -50,10 +71,18 @@ export function useLeads() {
         if (!error && data?.id) setClientId(data.id)
       } catch (err) {
         console.error('Failed to resolve client id', err)
+        setLoading(false)
       }
     }
     resolveClientId()
   }, [supabase])
+
+  // When admin selects a client, set clientId to trigger fetchLeads
+  useEffect(() => {
+    if (isAdmin && selectedAdminClientId) {
+      setClientId(selectedAdminClientId)
+    }
+  }, [isAdmin, selectedAdminClientId])
 
   const fetchLeads = useCallback(async () => {
     if (!clientId) return
@@ -70,10 +99,6 @@ export function useLeads() {
       setLoading(false)
     }
   }, [clientId])
-
-  useEffect(() => {
-    fetchLeads()
-  }, [fetchLeads])
 
   const updateLeadStatusByPhone = useCallback(
     async (phone: string, newStatus: string): Promise<boolean> => {
@@ -318,5 +343,9 @@ export function useLeads() {
     handleBulkActivate,
     handleBulkDeactivate,
     isLeadActive,
+    isAdmin,
+    allClients,
+    selectedAdminClientId,
+    setSelectedAdminClientId,
   }
 }

@@ -7,6 +7,8 @@ import {
   applySmsTemplatePlaceholders,
 } from '@/lib/sms-template-placeholders'
 
+const ADMIN_EMAILS = ['rod@mindsheep.com.au', 'david@mindsheep.com.au']
+
 type ClientProfile = {
   id: string
   created_at: string
@@ -55,81 +57,101 @@ export default function SettingsPage() {
   })
   const [userEmail, setUserEmail] = useState<string | null>(null)
 
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [allClients, setAllClients] = useState<{ id: string; name: string | null; email: string | null }[]>([])
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null)
+
   // ────────────────────────────────────────────────
   // Load profile + campaign settings
   // ────────────────────────────────────────────────
+  async function loadClientProfile(emailOrId: string, byId = false) {
+    setLoading(true)
+    const query = supabase.from('clients').select('*')
+    const { data, error } = await (byId ? query.eq('id', emailOrId) : query.eq('email', emailOrId)).single()
+
+    if (error || !data) {
+      setStatus({ message: 'No client profile found.', type: 'error' })
+      setLoading(false)
+      return
+    }
+
+    setProfile(data)
+    setForm({
+      name: data.name ?? '',
+      timezone: data.timezone ?? '',
+      vapi_assistant_id: data.vapi_assistant_id ?? '',
+      country_code: data.country_code ?? '',
+    })
+    // Load campaign settings into UI-friendly days array
+    if (data.campaign_settings?.daily_schedule?.length > 0) {
+      const loadedDays = data.campaign_settings.daily_schedule.map((s: any) => {
+        const actions = s.actions || []
+        let action: CampaignDay['action'] = 'none'
+        let times: string[] = []
+
+        if (actions.length === 1) {
+          action = actions[0].type
+          times = actions[0].times || []
+        } 
+        // else if (actions.length === 2) {
+        //   action = 'both'
+        //   // Merge times (assuming same times for call & sms)
+        //   times = [...new Set([...(actions[0].times || []), ...(actions[1].times || [])])]
+        // }
+
+        return {
+          day_offset: s.day_offset,
+          action,
+          times,
+        }
+      })
+
+      setDays(loadedDays)
+    } else {
+      // Default: one empty day
+      setDays([{ day_offset: 0, action: 'none', times: [] }])
+    }
+
+    const rawSms = data.campaign_settings?.sms_templates
+    if (rawSms && typeof rawSms === 'object' && !Array.isArray(rawSms)) {
+      setSmsTemplates(
+        Object.fromEntries(
+          Object.entries(rawSms).filter(([, v]) => typeof v === 'string')
+        ) as Record<string, string>
+      )
+    } else {
+      setSmsTemplates({})
+    }
+    setLoading(false)
+  }
+
   useEffect(() => {
     async function loadProfile() {
       setLoading(true)
       try {
         const { data: { user }, error: userError } = await supabase.auth.getUser()
-
         if (userError || !user?.email) {
           setStatus({ message: 'Could not load user session.', type: 'error' })
           return
         }
 
         setUserEmail(user.email)
+        const admin = ADMIN_EMAILS.includes(user.email.toLowerCase())
+        setIsAdmin(admin)
 
-        const { data, error } = await supabase
-          .from('clients')
-          .select('*')
-          .eq('email', user.email)
-          .single()
-
-        if (error || !data) {
-          setStatus({ message: 'No client profile found.', type: 'error' })
+        if (admin) {
+          // Load all clients for the admin selector
+          const { data, error } = await supabase
+            .from('clients')
+            .select('id, name, email')
+            .order('name')
+          if (!error && data) setAllClients(data)
+          setLoading(false)
           return
         }
 
-        setProfile(data)
-        setForm({
-          name: data.name ?? '',
-          timezone: data.timezone ?? '',
-          vapi_assistant_id: data.vapi_assistant_id ?? '',
-          country_code: data.country_code ?? '',
-        })
-
-        // Load campaign settings into UI-friendly days array
-        if (data.campaign_settings?.daily_schedule?.length > 0) {
-          const loadedDays = data.campaign_settings.daily_schedule.map((s: any) => {
-            const actions = s.actions || []
-            let action: CampaignDay['action'] = 'none'
-            let times: string[] = []
-
-            if (actions.length === 1) {
-              action = actions[0].type
-              times = actions[0].times || []
-            } 
-            // else if (actions.length === 2) {
-            //   action = 'both'
-            //   // Merge times (assuming same times for call & sms)
-            //   times = [...new Set([...(actions[0].times || []), ...(actions[1].times || [])])]
-            // }
-
-            return {
-              day_offset: s.day_offset,
-              action,
-              times,
-            }
-          })
-
-          setDays(loadedDays)
-        } else {
-          // Default: one empty day
-          setDays([{ day_offset: 0, action: 'none', times: [] }])
-        }
-
-        const rawSms = data.campaign_settings?.sms_templates
-        if (rawSms && typeof rawSms === 'object' && !Array.isArray(rawSms)) {
-          setSmsTemplates(
-            Object.fromEntries(
-              Object.entries(rawSms).filter(([, v]) => typeof v === 'string')
-            ) as Record<string, string>
-          )
-        } else {
-          setSmsTemplates({})
-        }
+        // Normal client — load their own profile
+        await loadClientProfile(user.email)
       } catch (err) {
         setStatus({
           message: err instanceof Error ? err.message : 'Unexpected error loading profile.',
@@ -142,6 +164,12 @@ export default function SettingsPage() {
 
     loadProfile()
   }, [])
+
+  useEffect(() => {
+    if (isAdmin && selectedClientId) {
+      loadClientProfile(selectedClientId, true)
+    }
+  }, [isAdmin, selectedClientId])
 
   // ────────────────────────────────────────────────
   // Day management helpers (unused while Campaign Settings UI is commented out)
@@ -286,6 +314,28 @@ export default function SettingsPage() {
     <div className="flex flex-col min-h-screen bg-slate-50">
       {/* Scrollable main content */}
       <main className="flex-1 px-4 py-10 overflow-y-auto">
+        {isAdmin && (
+          <div className="max-w-3xl p-4 mx-auto mb-6 border bg-amber-50 border-amber-200 rounded-xl">
+            <label className="block mb-2 text-sm font-semibold text-amber-800">
+              Admin View — Select a Client
+            </label>
+            <select
+              className="w-full px-3 py-2 text-sm bg-white border rounded-lg border-amber-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+              value={selectedClientId ?? ''}
+              onChange={e => {
+                setProfile(null)
+                setSelectedClientId(e.target.value || null)
+              }}
+            >
+              <option value="">-- Choose a client --</option>
+              {allClients.map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.name ?? '(no name)'} — {c.email}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="mb-8">
@@ -401,7 +451,7 @@ export default function SettingsPage() {
                   {days.map((day, index) => (
                     <div
                       key={index}
-                      className="p-5 border border-slate-200 rounded-xl bg-white shadow-sm"
+                      className="p-5 bg-white border shadow-sm border-slate-200 rounded-xl"
                     >
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="text-base font-medium text-slate-800">
@@ -470,7 +520,7 @@ export default function SettingsPage() {
                 </button>
 
                 {smsSlotKeys.length > 0 && (
-                  <div className="p-5 border border-slate-200 rounded-xl bg-slate-50 space-y-4">
+                  <div className="p-5 space-y-4 border border-slate-200 rounded-xl bg-slate-50">
                     <h3 className="text-base font-medium text-slate-800">SMS templates</h3>
                     <p className="text-sm text-slate-600">
                       Your automation maps each SMS send to an{' '}
@@ -482,7 +532,7 @@ export default function SettingsPage() {
                     </p>
                     {smsSlotKeys.map(key => (
                       <div key={key} className="flex flex-col gap-1.5">
-                        <label className="text-sm font-medium text-slate-700 font-mono">
+                        <label className="font-mono text-sm font-medium text-slate-700">
                           {key}
                         </label>
                         <textarea
@@ -501,7 +551,7 @@ export default function SettingsPage() {
                               type="button"
                               onClick={() => appendPlaceholder(key, token)}
                               disabled={saving}
-                              className="rounded-md border border-slate-200 bg-white px-2 py-1 font-mono text-xs text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                              className="px-2 py-1 font-mono text-xs bg-white border rounded-md border-slate-200 text-slate-700 hover:bg-slate-100 disabled:opacity-50"
                             >
                               {token}
                             </button>
