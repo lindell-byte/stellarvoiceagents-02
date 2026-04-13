@@ -69,6 +69,8 @@ export type LeadRow = {
   campaign_date?: string | null
   attempts_count?: number | null
   deactivation_details?: string | null
+  recordings_link?: string | null
+  call_evaluation?: boolean | null
   [key: string]: unknown
 }
 
@@ -81,8 +83,8 @@ export function mapLeadRowToLead(row: LeadRow): Lead {
     Email: row.email ?? '',
     'Call Status': row.call_status ?? '',
     'Campaign Date': formatDate(row.campaign_date),
-    'Recordings link': '',
-    'Call Evaluation': '',
+    'Recordings link': row.recordings_link ?? '',
+    'Call Evaluation': row.call_evaluation === true ? 'TRUE' : row.call_evaluation === false ? 'FALSE' : '',
     'Attempts Count': row.attempts_count != null ? String(row.attempts_count) : '',
     'Deactivation Details': row.deactivation_details ?? '',
   }

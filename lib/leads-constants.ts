@@ -50,5 +50,6 @@ export function isHotLead(lead: Lead): boolean {
   const hasRecording = String(lead['Recordings link'] || '').trim() !== ''
   const callEvaluation = String(lead['Call Evaluation'] || '').toUpperCase().trim()
   const evalIsTrue = callEvaluation === 'TRUE'
-  return isComplete && hasRecording && evalIsTrue
+  // return isComplete && hasRecording && evalIsTrue
+  return isComplete && evalIsTrue
 }
