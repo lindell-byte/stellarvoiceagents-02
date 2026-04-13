@@ -72,6 +72,8 @@ export function useLeads() {
           .eq('email', user.email)
           .single()
         if (!error && data?.id) setClientId(data.id)
+        else if (error) console.error('Failed to find client by email:', error)
+        setLoading(false)
       } catch (err) {
         console.error('Failed to resolve client id', err)
         setLoading(false)
@@ -102,6 +104,13 @@ export function useLeads() {
       setLoading(false)
     }
   }, [clientId])
+
+  // Auto-fetch leads whenever clientId is set
+  useEffect(() => {
+    if (clientId) {
+      fetchLeads()
+    }
+  }, [clientId, fetchLeads])
 
   const updateLeadStatusByPhone = useCallback(
     async (phone: string, newStatus: string): Promise<boolean> => {
