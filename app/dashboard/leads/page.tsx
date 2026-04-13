@@ -52,6 +52,7 @@ export default function DashboardLeadsPage() {
     clearSelection,
     handleBulkActivate,
     handleBulkDeactivate,
+    handleManualDeactivate,
     isLeadActive,
     isAdmin,
     allClients,
@@ -155,6 +156,7 @@ export default function DashboardLeadsPage() {
           onClearSelection={clearSelection}
           onBulkActivate={handleBulkActivate}
           onBulkDeactivate={handleBulkDeactivate}
+          onManualDeactivate={handleManualDeactivate}
           isLeadActive={isLeadActive}
         />
       )}

@@ -42,6 +42,7 @@ export function useLeads() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [selectedAdminClientId, setSelectedAdminClientId] = useState<string | null>(null)
   const [allClients, setAllClients] = useState<{ id: string; name: string | null; email: string | null }[]>([])
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null)
 
   // Resolve client_id once on mount
   useEffect(() => {
@@ -49,6 +50,8 @@ export function useLeads() {
       try {
         const { data: { user }, error: userError } = await supabase.auth.getUser()
         if (userError || !user?.email) return
+
+        setCurrentUserEmail(user.email)
 
         if (ADMIN_EMAILS.includes(user.email.toLowerCase())) {
           isAdminRef.current = true
@@ -118,6 +121,41 @@ export function useLeads() {
       return true
     },
     [clientId, supabase]
+  )
+
+  const handleManualDeactivate = useCallback(
+    async (phone: string): Promise<boolean> => {
+      if (!currentUserEmail) return false
+
+      const deactivationDetails = `Lead deactivated by ${currentUserEmail} (user)`
+      const { error } = await supabase
+        .from('leads')
+        .update({
+          call_status: 'Deactivated',
+          deactivation_details: deactivationDetails,
+        })
+        .eq('phone_number', phone)
+        .eq('client_id', clientId)
+
+      if (error) {
+        console.error('Failed to manually deactivate lead', error)
+        return false
+      }
+
+      setLeads((prev) =>
+        prev.map((l) =>
+          l['Phone Number'] === phone
+            ? {
+                ...l,
+                'Call Status': 'Deactivated',
+                'Deactivation Details': deactivationDetails,
+              }
+            : l
+        )
+      )
+      return true
+    },
+    [clientId, currentUserEmail, supabase]
   )
 
   const handleEdit = useCallback((lead: Lead) => {
@@ -344,6 +382,7 @@ export function useLeads() {
     clearSelection,
     handleBulkActivate,
     handleBulkDeactivate,
+    handleManualDeactivate,
     isLeadActive,
     isAdmin,
     allClients,
