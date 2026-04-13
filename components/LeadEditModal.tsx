@@ -186,8 +186,20 @@ export function LeadEditModal({
                 }
               />
             </div>
-          </div>
-        </div>
+          </div>          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-semibold text-slate-600">
+              Deactivation Details
+            </label>
+            <textarea
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 resize-none"
+              rows={3}
+              value={editForm['Deactivation Details']}
+              onChange={(e) =>
+                handleFieldChange('Deactivation Details', e.target.value)
+              }
+              placeholder="Enter reason for deactivation (optional)..."
+            />
+          </div>        </div>
         <div className="flex justify-end gap-2 border-t border-slate-200 px-6 py-4">
           <button
             className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"

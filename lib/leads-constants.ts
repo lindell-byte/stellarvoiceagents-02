@@ -29,6 +29,7 @@ export const CALL_STATUS_OPTIONS = [
   'Immediate call',
   'In Progress',
   'Complete',
+  'Deactivated',
 ]
 
 /** Fallback when tags API unavailable; app now loads from /api/tags */
@@ -37,9 +38,10 @@ export const TAGS_DEFAULT: string[] = []
 export function isLeadActive(lead: Lead): boolean {
   const callStatus = String(lead['Call Status'] || '').toLowerCase().trim()
   const isComplete = callStatus === 'complete'
+  const isDeactivated = callStatus === 'deactivated'
   // const allCallsFilled = CALL_SLOTS.every((slot) => String(lead[slot] || '').trim() !== '')
   const allCallsFilled = String(lead['Attempts Count']) == "11"
-  return !isComplete && !allCallsFilled
+  return !isComplete && !isDeactivated && !allCallsFilled
 }
 
 export function isHotLead(lead: Lead): boolean {
