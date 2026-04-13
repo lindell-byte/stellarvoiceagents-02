@@ -128,6 +128,7 @@ export function useLeads() {
       Email: lead['Email'] || '',
       'Call Status': lead['Call Status'] || '',
       'Campaign Date': lead['Campaign Date'] || '',
+      'Deactivation Details': lead['Deactivation Details'] || '',
     })
   }, [])
 
@@ -147,6 +148,7 @@ export function useLeads() {
         email: (editForm['Email'] || '').trim() || null,
         call_status: (editForm['Call Status'] || '').trim() || null,
         campaign_date: editForm['Campaign Date'] || null,
+        deactivation_details: (editForm['Deactivation Details'] || '').trim() || null,
       }
 
       try {

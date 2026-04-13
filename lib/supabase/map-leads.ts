@@ -68,6 +68,7 @@ export type LeadRow = {
   call_status?: string | null
   campaign_date?: string | null
   attempts_count?: number | null
+  deactivation_details?: string | null
   [key: string]: unknown
 }
 
@@ -83,6 +84,7 @@ export function mapLeadRowToLead(row: LeadRow): Lead {
     'Recordings link': '',
     'Call Evaluation': '',
     'Attempts Count': row.attempts_count != null ? String(row.attempts_count) : '',
+    'Deactivation Details': row.deactivation_details ?? '',
   }
   CALL_SLOTS.forEach((key) => {
     lead[key] = ''
