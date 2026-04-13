@@ -71,6 +71,8 @@ export type LeadRow = {
   deactivation_details?: string | null
   recordings_link?: string | null
   call_evaluation?: boolean | null
+  appointment_date?: string | null
+  appointment_time?: string | null
   [key: string]: unknown
 }
 
@@ -87,6 +89,8 @@ export function mapLeadRowToLead(row: LeadRow): Lead {
     'Call Evaluation': row.call_evaluation === true ? 'TRUE' : row.call_evaluation === false ? 'FALSE' : '',
     'Attempts Count': row.attempts_count != null ? String(row.attempts_count) : '',
     'Deactivation Details': row.deactivation_details ?? '',
+    'Appointment Date': formatDate(row.appointment_date),
+    'Appointment Time': row.appointment_time ?? '',
   }
   CALL_SLOTS.forEach((key) => {
     lead[key] = ''

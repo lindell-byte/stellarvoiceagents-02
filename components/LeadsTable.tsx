@@ -123,6 +123,12 @@ export function LeadsTable({
               Campaign Date {sortDir === 'desc' ? '\u25BC' : '\u25B2'}
             </th>
             <th className="px-4 py-3 text-xs font-semibold tracking-wide text-left uppercase bg-slate-50 text-slate-600">
+              Appointment Date
+            </th>
+            <th className="px-4 py-3 text-xs font-semibold tracking-wide text-left uppercase bg-slate-50 text-slate-600">
+              Appointment Time
+            </th>
+            <th className="px-4 py-3 text-xs font-semibold tracking-wide text-left uppercase bg-slate-50 text-slate-600">
               Attempts
             </th>
             <th className="px-4 py-3 text-xs font-semibold tracking-wide text-left uppercase bg-slate-50 text-slate-600">
@@ -140,7 +146,7 @@ export function LeadsTable({
           {filteredLeads.length === 0 ? (
             <tr>
               <td
-                colSpan={10}
+                colSpan={12}
                 className="px-4 py-10 text-sm text-center text-slate-400"
               >
                 {search ? 'No leads match your search' : 'No leads found'}
@@ -183,6 +189,12 @@ export function LeadsTable({
                   </td>
                   <td className="px-4 py-2.5">
                     {lead['Campaign Date'] || '-'}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    {lead['Appointment Date'] || '-'}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    {lead['Appointment Time'] || '-'}
                   </td>
                   <td className="px-4 py-2.5">{lead['Attempts Count'] || '0'}</td>
                   <td className="px-4 py-2.5">
