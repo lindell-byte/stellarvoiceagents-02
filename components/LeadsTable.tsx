@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { type Lead, type SortDirection } from '@/lib/leads-constants'
 import { LeadTagsCell } from '@/components/LeadTagsCell'
 
@@ -23,6 +24,7 @@ type LeadsTableProps = {
   onClearSelection: () => void
   onBulkActivate: () => void
   onBulkDeactivate: () => void
+  onManualDeactivate: (phone: string) => Promise<boolean>
   isLeadActive: (lead: Lead) => boolean
 }
 
@@ -46,8 +48,10 @@ export function LeadsTable({
   onClearSelection,
   onBulkActivate,
   onBulkDeactivate,
+  onManualDeactivate,
   isLeadActive,
 }: LeadsTableProps) {
+  const [deactivatingPhone, setDeactivatingPhone] = useState<string | null>(null)
   return (
     <div className="min-h-0 max-h-[calc(100vh-220px)] flex-1 overflow-auto rounded-xl bg-white shadow-xl shadow-slate-900/5">
       {selectedPhones.size > 0 && (
@@ -201,13 +205,32 @@ export function LeadsTable({
                     onDeleteTag={onDeleteTag}
                   />
                   <td className="whitespace-nowrap px-4 py-2.5">
-                    <button
-                      className="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
-                      onClick={() => onEdit(lead)}
-                      type="button"
-                    >
-                      Edit
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        className="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
+                        onClick={() => onEdit(lead)}
+                        type="button"
+                      >
+                        Edit
+                      </button>
+                      {active && (
+                        <button
+                          className="inline-flex items-center rounded-md border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          onClick={async () => {
+                            setDeactivatingPhone(phone)
+                            try {
+                              await onManualDeactivate(phone)
+                            } finally {
+                              setDeactivatingPhone(null)
+                            }
+                          }}
+                          disabled={deactivatingPhone === phone}
+                          type="button"
+                        >
+                          {deactivatingPhone === phone ? 'Deactivating...' : 'Deactivate'}
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               )
