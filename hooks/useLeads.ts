@@ -133,10 +133,10 @@ export function useLeads() {
   )
 
   const handleManualDeactivate = useCallback(
-    async (phone: string): Promise<boolean> => {
+    async (phone: string, reason: string): Promise<boolean> => {
       if (!currentUserEmail) return false
 
-      const deactivationDetails = `Lead deactivated by ${currentUserEmail} (user)`
+      const deactivationDetails = `${reason} (deactivated by ${currentUserEmail})`
       const { error } = await supabase
         .from('leads')
         .update({
@@ -323,37 +323,39 @@ export function useLeads() {
     }
   }, [clearSelection, leads, selectedPhones, updateLeadStatusByPhone])
 
-  const handleBulkDeactivate = useCallback(async () => {
-    const phones = Array.from(selectedPhones)
-    const toDeactivate = phones.filter((phone) => {
-      const lead = leads.find((l) => l['Phone Number'] === phone)
-      return lead && isLeadActive(lead)
-    })
+  const handleBulkDeactivate = useCallback(
+    async (reason: string) => {
+      const phones = Array.from(selectedPhones)
+      const toDeactivate = phones.filter((phone) => {
+        const lead = leads.find((l) => l['Phone Number'] === phone)
+        return lead && isLeadActive(lead)
+      })
 
-    if (toDeactivate.length === 0) {
-      alert('No active leads in the current selection.')
-      return
-    }
-
-    setBulkUpdating(true)
-    try {
-      const failures: string[] = []
-      for (const phone of toDeactivate) {
-        const ok = await updateLeadStatusByPhone(phone, 'Complete')
-        if (!ok) failures.push(phone)
+      if (toDeactivate.length === 0) {
+        alert('No active leads in the current selection.')
+        return
       }
-      if (failures.length > 0) {
-        alert(`Failed to deactivate ${failures.length} lead(s). Others were updated.`)
-      }
-      clearSelection()
-    } catch (err) {
-      console.error('Bulk deactivate failed', err)
-      alert('Bulk deactivation failed. Please try again.')
-    } finally {
-      setBulkUpdating(false)
-    }
-  }, [clearSelection, leads, selectedPhones, updateLeadStatusByPhone])
 
+      setBulkUpdating(true)
+      try {
+        const failures: string[] = []
+        for (const phone of toDeactivate) {
+          const ok = await handleManualDeactivate(phone, reason)
+          if (!ok) failures.push(phone)
+        }
+        if (failures.length > 0) {
+          alert(`Failed to deactivate ${failures.length} lead(s). Others were updated.`)
+        }
+        clearSelection()
+      } catch (err) {
+        console.error('Bulk deactivate failed', err)
+        alert('Bulk deactivation failed. Please try again.')
+      } finally {
+        setBulkUpdating(false)
+      }
+    },
+    [clearSelection, leads, selectedPhones, handleManualDeactivate]
+  )
   const hotLeads = leads.filter(isHotLead)
   const activeCount = leads.filter(isLeadActive).length
   const inactiveCount = leads.length - activeCount - hotLeads.length

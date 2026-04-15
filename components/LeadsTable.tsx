@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { type Lead, type SortDirection } from '@/lib/leads-constants'
 import { LeadTagsCell } from '@/components/LeadTagsCell'
+import { DeactivateReasonModal } from '@/components/DeactivateReasonModal'
 
 type LeadsTableProps = {
   filteredLeads: Lead[]
@@ -23,8 +24,8 @@ type LeadsTableProps = {
   onToggleSelectAllVisible: () => void
   onClearSelection: () => void
   onBulkActivate: () => void
-  onBulkDeactivate: () => void
-  onManualDeactivate: (phone: string) => Promise<boolean>
+  onBulkDeactivate: (reason: string) => void
+  onManualDeactivate: (phone: string, reason: string) => Promise<boolean>
   isLeadActive: (lead: Lead) => boolean
 }
 
@@ -52,8 +53,66 @@ export function LeadsTable({
   isLeadActive,
 }: LeadsTableProps) {
   const [deactivatingPhone, setDeactivatingPhone] = useState<string | null>(null)
+  const [showDeactivateReasonModal, setShowDeactivateReasonModal] = useState(false)
+  const [pendingDeactivationPhone, setPendingDeactivationPhone] = useState<string | null>(null)
+  const [isDeactivating, setIsDeactivating] = useState(false)
+  const [showBulkDeactivateReasonModal, setShowBulkDeactivateReasonModal] = useState(false)
+
+  const handleDeactivateClick = (phone: string) => {
+    setPendingDeactivationPhone(phone)
+    setShowDeactivateReasonModal(true)
+  }
+
+  const handleDeactivateConfirm = async (reason: string) => {
+    if (!pendingDeactivationPhone) return
+    setIsDeactivating(true)
+    setDeactivatingPhone(pendingDeactivationPhone)
+
+    try {
+      await onManualDeactivate(pendingDeactivationPhone, reason)
+    } finally {
+      setIsDeactivating(false)
+      setDeactivatingPhone(null)
+      setShowDeactivateReasonModal(false)
+      setPendingDeactivationPhone(null)
+    }
+  }
+
+  const handleDeactivateCancel = () => {
+    setShowDeactivateReasonModal(false)
+    setPendingDeactivationPhone(null)
+  }
+
+  const handleBulkDeactivateClick = () => {
+    setShowBulkDeactivateReasonModal(true)
+  }
+
+  const handleBulkDeactivateConfirm = (reason: string) => {
+    onBulkDeactivate(reason)
+    setShowBulkDeactivateReasonModal(false)
+  }
+
+  const handleBulkDeactivateCancel = () => {
+    setShowBulkDeactivateReasonModal(false)
+  }
+
   return (
-    <div className="min-h-0 max-h-[calc(100vh-220px)] flex-1 overflow-auto rounded-xl bg-white shadow-xl shadow-slate-900/5">
+    <>
+      <DeactivateReasonModal
+        isOpen={showDeactivateReasonModal}
+        onConfirm={handleDeactivateConfirm}
+        onCancel={handleDeactivateCancel}
+        isLoading={isDeactivating}
+      />
+      <DeactivateReasonModal
+        isOpen={showBulkDeactivateReasonModal}
+        isBulk={true}
+        bulkCount={selectedPhones.size}
+        onConfirm={handleBulkDeactivateConfirm}
+        onCancel={handleBulkDeactivateCancel}
+        isLoading={bulkUpdating}
+      />
+      <div className="min-h-0 max-h-[calc(100vh-220px)] flex-1 overflow-auto rounded-xl bg-white shadow-xl shadow-slate-900/5">
       {selectedPhones.size > 0 && (
         <div className="flex items-center justify-between gap-3 border-b border-blue-200 bg-blue-50 px-4 py-3">
           <p className="text-sm font-semibold text-blue-900">
@@ -71,7 +130,7 @@ export function LeadsTable({
             <button
               type="button"
               className="inline-flex items-center rounded-md border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-800 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-              onClick={onBulkDeactivate}
+              onClick={handleBulkDeactivateClick}
               disabled={bulkUpdating}
             >
               {bulkUpdating ? 'Working...' : 'Deactivate'}
@@ -228,15 +287,8 @@ export function LeadsTable({
                       {active && (
                         <button
                           className="inline-flex items-center rounded-md border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-                          onClick={async () => {
-                            setDeactivatingPhone(phone)
-                            try {
-                              await onManualDeactivate(phone)
-                            } finally {
-                              setDeactivatingPhone(null)
-                            }
-                          }}
-                          disabled={deactivatingPhone === phone}
+                          onClick={() => handleDeactivateClick(phone)}
+                          disabled={deactivatingPhone === phone || isDeactivating}
                           type="button"
                         >
                           {deactivatingPhone === phone ? 'Deactivating...' : 'Deactivate'}
@@ -250,6 +302,7 @@ export function LeadsTable({
           )}
         </tbody>
       </table>
-    </div>
+      </div>
+    </>
   )
 }
