@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { CALL_STATUS_OPTIONS, type Lead } from '@/lib/leads-constants'
+import { CALL_STATUS_OPTIONS, DEACTIVATION_REASONS, type Lead } from '@/lib/leads-constants'
 
 // TODO(DB): When tags are persisted, optionally add Tags field to this form and sync with DB on save.
 
@@ -190,15 +190,35 @@ export function LeadEditModal({
             <label className="text-sm font-semibold text-slate-600">
               Deactivation Details
             </label>
-            <textarea
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 resize-none"
-              rows={3}
-              value={editForm['Deactivation Details']}
-              onChange={(e) =>
-                handleFieldChange('Deactivation Details', e.target.value)
-              }
-              placeholder="Enter reason for deactivation (optional)..."
-            />
+            <div className="flex flex-col gap-2">
+              <select
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+                value={editForm['Deactivation Details']}
+                onChange={(e) =>
+                  handleFieldChange('Deactivation Details', e.target.value)
+                }
+              >
+                <option value="">Select a reason or enter custom...</option>
+                {Object.entries(DEACTIVATION_REASONS).map(([category, reasons]) => (
+                  <optgroup key={category} label={category}>
+                    {reasons.map((reason) => (
+                      <option key={reason} value={reason}>
+                        {reason}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+              <textarea
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 resize-none"
+                rows={2}
+                value={editForm['Deactivation Details']}
+                onChange={(e) =>
+                  handleFieldChange('Deactivation Details', e.target.value)
+                }
+                placeholder="Or enter a custom reason..."
+              />
+            </div>
           </div>        </div>
         <div className="flex justify-end gap-2 border-t border-slate-200 px-6 py-4">
           <button

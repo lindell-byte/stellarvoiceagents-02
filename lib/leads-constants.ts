@@ -32,6 +32,34 @@ export const CALL_STATUS_OPTIONS = [
   'Deactivated',
 ]
 
+export const DEACTIVATION_REASONS: Record<string, string[]> = {
+  'Compliance': [
+    'Do Not Call',
+    'Abusive/Harassing',
+  ],
+  'Contact Issues': [
+    'Wrong Number',
+    'Disconnected/Invalid',
+    'Unreachable',
+    'Invalid Contact Info',
+  ],
+  'Business Logic': [
+    'Already a Customer',
+    'Already Using Competitor',
+    'Business Closed',
+    'Duplicate Lead',
+  ],
+  'Lead Quality': [
+    'Not Interested',
+    'Language Barrier',
+    'No Callback Scheduled',
+    'Data Quality Issue',
+  ],
+  'Admin': [
+    'Manual Hold',
+  ],
+}
+
 /** Fallback when tags API unavailable; app now loads from /api/tags */
 export const TAGS_DEFAULT: string[] = []
 
