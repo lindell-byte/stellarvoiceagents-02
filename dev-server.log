@@ -16,6 +16,10 @@
 
 ✓ Starting...
 ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
-✓ Ready in 1587ms
- GET /api/lead-activity?lead_id=632e4653-b5d5-4a6c-9edd-14869559aed7 200 in 2.0s (compile: 784ms, render: 1231ms)
- GET /api/lead-activity 400 in 12ms (compile: 5ms, render: 7ms)
+✓ Ready in 1580ms
+ GET /api/lead-activity?lead_id=632e4653-b5d5-4a6c-9edd-14869559aed7 200 in 1651ms (compile: 469ms, render: 1182ms)
+○ Compiling /dashboard/leads ...
+ GET /dashboard/leads 200 in 5.9s (compile: 3.4s, proxy.ts: 2.0s, render: 459ms)
+ GET /api/lead-tags 200 in 1000ms (compile: 185ms, render: 815ms)
+ GET /api/tags 200 in 1161ms (compile: 87ms, render: 1074ms)
+ GET /api/leads?client_id=43a432bb-b08d-408e-aea2-aec6c44e76d1 200 in 703ms (compile: 74ms, render: 629ms)

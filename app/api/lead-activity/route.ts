@@ -21,6 +21,14 @@ export type TextActivity = {
   phone_number_to: string | null
 }
 
+export type EmailActivity = {
+  id: string
+  created_at: string | null
+  status: string | null
+  subject: string | null
+  email_to: string | null
+}
+
 // n8n writes some values with a leading "=" (spreadsheet-formula artifact). Strip it for display.
 function clean(value: string | null): string | null {
   if (typeof value !== 'string') return value
@@ -39,7 +47,7 @@ export async function GET(request: Request) {
 
     const supabase = createServerClient()
 
-    const [callsRes, textsRes] = await Promise.all([
+    const [callsRes, textsRes, emailsRes] = await Promise.all([
       supabase
         .from('call_logs')
         .select('id, timestamp, ended_reason, call_outcome, summary, call_duration_seconds, recording_url')
@@ -48,6 +56,11 @@ export async function GET(request: Request) {
       supabase
         .from('sms_logs')
         .select('id, created_at, status, message_body, phone_number_to')
+        .eq('lead_id', leadId)
+        .order('created_at', { ascending: true }),
+      supabase
+        .from('email_logs')
+        .select('id, created_at, status, subject, email_to')
         .eq('lead_id', leadId)
         .order('created_at', { ascending: true }),
     ])
@@ -61,6 +74,24 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: textsRes.error.message }, { status: 500 })
     }
 
+    // email_logs is optional: soft-fail if the table doesn't exist yet (PGRST205 / 42P01)
+    // so the dashboard keeps working before the migration is applied.
+    let emails: EmailActivity[] = []
+    if (emailsRes.error) {
+      const code = (emailsRes.error as { code?: string }).code
+      if (code !== 'PGRST205' && code !== '42P01') {
+        console.error('[api/lead-activity] email_logs', emailsRes.error)
+        return NextResponse.json({ error: emailsRes.error.message }, { status: 500 })
+      }
+    } else {
+      emails = ((emailsRes.data ?? []) as EmailActivity[]).map((e) => ({
+        ...e,
+        status: clean(e.status),
+        subject: clean(e.subject),
+        email_to: clean(e.email_to),
+      }))
+    }
+
     const calls = (callsRes.data ?? []) as CallActivity[]
     const texts = ((textsRes.data ?? []) as TextActivity[]).map((t) => ({
       ...t,
@@ -69,7 +100,7 @@ export async function GET(request: Request) {
       phone_number_to: clean(t.phone_number_to),
     }))
 
-    return NextResponse.json({ calls, texts })
+    return NextResponse.json({ calls, texts, emails })
   } catch (err) {
     console.error('[api/lead-activity]', err)
     return NextResponse.json(
