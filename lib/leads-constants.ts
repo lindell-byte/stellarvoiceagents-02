@@ -63,6 +63,14 @@ export const DEACTIVATION_REASONS: Record<string, string[]> = {
 /** Fallback when tags API unavailable; app now loads from /api/tags */
 export const TAGS_DEFAULT: string[] = []
 
+/**
+ * Date when email logging to `email_logs` was switched on in n8n.
+ * Set this to the activation date (YYYY-MM-DD) so the AttemptsModal can show
+ * a note that email history only starts from that point. Leave empty until
+ * email logging is live.
+ */
+export const EMAIL_LOGGING_START_DATE = '2026-06-01'
+
 export function isLeadActive(lead: Lead): boolean {
   const callStatus = String(lead['Call Status'] || '').toLowerCase().trim()
   const isComplete = callStatus === 'complete'
