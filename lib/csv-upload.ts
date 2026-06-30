@@ -52,6 +52,22 @@ export function findColumnName(headers: string[], aliases: string[]): string | n
   return null
 }
 
+/**
+ * Normalize an Australian mobile to the local 04XXXXXXXX format so the dedup
+ * check (run by n8n on the uploaded payload) compares a single canonical form.
+ * Handles +614…, 614…, 4… (leading 0 dropped by spreadsheets), and 04… input.
+ * Falls back to a digits-only string for anything else, so even non-AU rows
+ * dedup consistently across uploads.
+ */
+export function normalizePhoneNumber(raw: string): string {
+  if (!raw) return ''
+  const digits = raw.replace(/\D/g, '')
+  if (digits.length === 11 && digits.startsWith('614')) return '0' + digits.slice(2)
+  if (digits.length === 10 && digits.startsWith('04')) return digits
+  if (digits.length === 9 && digits.startsWith('4')) return '0' + digits
+  return digits
+}
+
 function formatDateForWebhook(date: Date): string {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -152,7 +168,7 @@ export function transformContacts(
       lastName = nameParts.slice(1).join(' ') || ''
     }
 
-    const phone = phoneCol ? contact[phoneCol] || '' : ''
+    const phone = normalizePhoneNumber(phoneCol ? contact[phoneCol] || '' : '')
     const email = emailCol ? contact[emailCol] || '' : ''
 
     const result: TransformedContact = {
